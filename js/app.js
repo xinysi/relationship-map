@@ -1437,18 +1437,16 @@ const App = {
       width: 560,
       bodyHTML: `
         <div class="dt-section-title" style="border:none;margin-top:0;padding-top:0">可视化成果导出（无水印）</div>
-        <div class="form-row" style="align-items:flex-end">
-          <div class="form-item"><label>图片分辨率</label>
-            <select id="expScale"><option value="1">标准 1×（适合屏幕查看）</option><option value="2" selected>高清 2×（推荐）</option><option value="3">超清 3×（适合打印）</option></select></div>
-          <div class="form-item" style="flex:2"><label>&nbsp;</label>
-            <div style="display:flex;gap:8px;flex-wrap:wrap">
-              <button class="btn" data-act="png">PNG 图片</button>
-              <button class="btn" data-act="jpg">JPG 图片</button>
-              <button class="btn" data-act="pngt">透明底 PNG</button>
-              <button class="btn primary" data-act="pdf">PDF 文件</button>
-              <button class="btn" data-act="svg">SVG 矢量图</button>
-              <label class="form-check" style="margin:0 0 0 4px"><input type="checkbox" id="expEdgeLabels"> 含边标签</label>
-            </div></div>
+        <div class="form-item" style="max-width:280px"><label>图片分辨率（PNG / JPG / PDF 适用）</label>
+          <select id="expScale"><option value="1">标准 1×（适合屏幕查看）</option><option value="2" selected>高清 2×（推荐）</option><option value="3">超清 3×（适合打印）</option></select>
+          <div class="form-hint">SVG 矢量图无限缩放，不依赖分辨率</div></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button class="btn" data-act="png">PNG 图片</button>
+          <button class="btn" data-act="jpg">JPG 图片</button>
+          <button class="btn" data-act="pngt">透明底 PNG</button>
+          <button class="btn primary" data-act="pdf">PDF 文件</button>
+          <button class="btn" data-act="svg">SVG 矢量图</button>
+          <label class="form-check" style="margin:0"><input type="checkbox" id="expEdgeLabels"> 含边标签</label>
         </div>
         <div class="dt-section-title">源数据导出（可二次修改 / 存档 / 复用）</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">

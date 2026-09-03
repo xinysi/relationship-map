@@ -74,19 +74,22 @@ test('JSON 导入：中英键兼容', async () => {
   assert.equal(parsed.relations[0].strength, 6);
 });
 
-test('SVG 矢量文档：结构完整 + XSS 转义', () => {
+test('SVG 矢量文档：默认无标签墙 + 选项生效 + XSS 转义', () => {
   const { SampleData, Renderer } = load();
   GraphStore.init();
   for (const p of SampleData.persons) GraphStore.addPerson(p, { silent: true });
   for (const r of SampleData.relations) GraphStore.addRelation(r, { silent: true });
   GraphStore.reindex();
   Renderer.theme = Renderer.THEMES.light;
-  Renderer.theme = Renderer.THEMES.light;
   const doc = DataIO._svgDocument();
   assert.ok(doc && doc.svg.startsWith('<?xml'));
   assert.equal((doc.svg.match(/<circle/g) || []).length, GraphStore.persons.length, '每节点一个 circle');
   assert.ok(doc.svg.includes('<path'), '关系边为 path');
   assert.ok(doc.svg.includes('<text'), '含节点名文字');
+  // 默认不导出边标签（避免标签墙拥挤），勾选后包含
+  assert.equal((doc.svg.match(/rx="4"/g) || []).length, 0, '默认无边标签');
+  const docL = DataIO._svgDocument({ labels: true });
+  assert.ok((docL.svg.match(/rx="4"/g) || []).length > 0, '勾选后包含边标签');
   // XSS 防护：特殊字符转义
   GraphStore.persons[0].name = '甲<&>乙';
   const doc2 = DataIO._svgDocument();

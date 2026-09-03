@@ -1447,6 +1447,7 @@ const App = {
               <button class="btn" data-act="pngt">透明底 PNG</button>
               <button class="btn primary" data-act="pdf">PDF 文件</button>
               <button class="btn" data-act="svg">SVG 矢量图</button>
+              <label class="form-check" style="margin:0 0 0 4px"><input type="checkbox" id="expEdgeLabels"> 含边标签</label>
             </div></div>
         </div>
         <div class="dt-section-title">源数据导出（可二次修改 / 存档 / 复用）</div>
@@ -1476,8 +1477,8 @@ const App = {
     m.body.parentElement.querySelector('[data-act=pdf]').onclick = () => { if (imgGuard()) { const r = DataIO.exportPDF(scale()); if (r && r.ok) this.toast('PDF 文件已导出', 'success'); } };
     m.body.parentElement.querySelector('[data-act=svg]').onclick = () => {
       if (imgGuard()) {
-        const r = DataIO.exportDataSVG();
-        if (r && r.ok) this.toast(`SVG 矢量图已导出（${r.w}×${r.h}，可无限缩放）`, 'success');
+        const r = DataIO.exportDataSVG({ labels: q('#expEdgeLabels').checked });
+        if (r && r.ok) this.toast(`SVG 矢量图已导出（${r.w}×${r.h}，可无限缩放${r.labels ? ' · 含边标签' : ''}）`, 'success');
       }
     };
     m.body.parentElement.querySelector('[data-act=json]').onclick = () => { if (imgGuard()) { DataIO.exportDataJSON(); this.toast('JSON 源数据已导出', 'success'); } };

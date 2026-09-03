@@ -1511,20 +1511,22 @@ const DataIO = {
     return { ok: true, w: res.w, h: res.h };
   },
 
-  /* ---------- SVG 矢量导出（无限缩放；渲染逻辑与画布一致，含平行边/箭头/标签） ---------- */
-  exportDataSVG() {
-    const doc = this._svgDocument();
+  /* ---------- SVG 矢量导出（无限缩放；渲染逻辑与画布一致，含平行边/箭头/标签）
+     opts.labels：是否包含关系标签（默认 false——避免标签墙拥挤，影响信息密度） ---------- */
+  exportDataSVG(opts) {
+    const doc = this._svgDocument(opts);
     if (!doc) return { error: this.MSG.EMPTY_EXPORT };
     Utils.download(`${GraphStore.projectName}-人物关系网.svg`, new Blob([doc.svg], { type: 'image/svg+xml;charset=utf-8' }), 'image/svg+xml');
-    GraphStore.log(`导出 SVG 矢量图（${doc.edges} 边 / ${doc.persons} 节点）`);
+    GraphStore.log(`导出 SVG 矢量图（${doc.edges} 边 / ${doc.persons} 节点${doc.labels ? ' · 含关系标签' : ''}）`);
     return { ok: true, w: doc.w, h: doc.h };
   },
 
   /* SVG 文档生成（纯逻辑，供导出与测试复用） */
-  _svgDocument() {
+  _svgDocument(opts) {
     if (GraphStore.isEmpty()) return null;
     const bbox = Renderer.bboxOfVisible();
     if (!bbox) return null;
+    const withLabels = !!(opts && opts.labels);
     const pad = 40;
     const x0 = bbox.x - pad, y0 = bbox.y - pad;
     const w = bbox.w + pad * 2, h = bbox.h + pad * 2;
@@ -1535,6 +1537,7 @@ const DataIO = {
 
     if (Renderer._parallelDirty) Renderer._buildParallel();
     const visEdges = [];
+    const vis = GraphStore.persons.filter(p => GraphStore.isPersonVisible(p));
     for (const r of GraphStore.relations) {
       if (!GraphStore.isEdgeVisible(r)) continue;
       const s = GraphStore.getPerson(r.sourceId), t = GraphStore.getPerson(r.targetId);
@@ -1542,8 +1545,56 @@ const DataIO = {
       visEdges.push({ r, s, t });
     }
 
-    // 关系边：与画布一致的平行偏移 / 宽度公式 / 虚线
+    // ---- 导出坐标快照 + 标签重叠松弛 ----
+    // 密集布局（如分簇 52px 间距）下标签互相压盖：在导出快照中把碰撞节点沿连线局部撑开，
+    // 不回写画布数据，保证 SVG 信息可读（n ≤ 800 时启用，避免 O(n²) 超时）
+    const nodeFs = Renderer.options.labelSize;
+    const textW = (s) => {
+      let wpx = 0, fs2 = nodeFs;
+      for (const ch of String(s)) wpx += /[\u2e80-\u9fff\uff00-\uffef]/.test(ch) ? fs2 : fs2 * 0.58;
+      return Math.max(fs2, wpx);
+    };
+    const coords = new Map(vis.map(p => [p.id, { x: p.x, y: p.y }]));
+    const rects = vis.map(p => ({ r: Renderer.nodeRadius(p), tw: textW(p.name || '未命名') }));
+    const labelRect = (i) => {
+      const c = coords.get(vis[i].id), q = rects[i];
+      return { x: c.x - q.tw / 2, y: c.y + q.r + 3, w: q.tw, h: nodeFs * 1.5 };
+    };
+    const rectNodeCircle = (rc, j) => {
+      const cj = coords.get(vis[j].id), rj = rects[j];
+      const cx = Math.max(rc.x, Math.min(cj.x, rc.x + rc.w));
+      const cy = Math.max(rc.y, Math.min(cj.y, rc.y + rc.h));
+      return Math.hypot(cj.x - cx, cj.y - cy) < rj.r + 2;
+    };
+    const rectsInter = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+    if (vis.length > 1 && vis.length <= 800) {
+      const STEP = 2.5;
+      for (let iter = 0; iter < 40; iter++) {
+        let any = false;
+        for (let i = 0; i < vis.length; i++) {
+          const ci = coords.get(vis[i].id), ri = labelRect(i);
+          for (let j = i + 1; j < vis.length; j++) {
+            const cj = coords.get(vis[j].id);
+            const rj = labelRect(j);
+            if (Math.abs(ci.x - cj.x) > (ri.w + rj.w) / 2 + 12) continue;
+            if (rectsInter(ri, rj) || rectNodeCircle(ri, j) || rectNodeCircle(rj, i)) {
+              const dx = cj.x - ci.x, dy = cj.y - ci.y;
+              const d = Math.hypot(dx, dy) || 0.01;
+              const ux = dx / d, uy = dy / d;
+              ci.x -= ux * STEP; ci.y -= uy * STEP;
+              cj.x += ux * STEP; cj.y += uy * STEP;
+              any = true;
+            }
+          }
+        }
+        if (!any) break;
+      }
+    }
+
+    // 关系边：与画布一致的平行偏移 / 宽度公式 / 虚线（坐标取导出快照）
     for (const { r, s, t } of visEdges) {
+      const cs = coords.get(s.id), ct = coords.get(t.id);
+      if (!cs || !ct) continue;
       const meta = Renderer._parallel.get(r.id) || { index: 0, count: 1, selfLoop: false };
       const st = r.style || {};
       const color = st.color || Utils.colorForType(r.relationType);
@@ -1552,56 +1603,58 @@ const DataIO = {
       let d;
       if (meta.selfLoop) {
         const ang = -Math.PI / 4;
-        const cx = s.x + Math.cos(ang) * rr * 1.9, cy = s.y + Math.sin(ang) * rr * 1.9;
+        const cx = cs.x + Math.cos(ang) * rr * 1.9, cy = cs.y + Math.sin(ang) * rr * 1.9;
         const rad = Math.max(6, rr * 0.9);
         d = `M ${f(cx + rad)} ${f(cy)} A ${f(rad)} ${f(rad)} 0 1 1 ${f(cx - rad)} ${f(cy)} A ${f(rad)} ${f(rad)} 0 1 1 ${f(cx + rad)} ${f(cy)}`;
       } else {
-        const dx = t.x - s.x, dy = t.y - s.y;
+        const dx = ct.x - cs.x, dy = ct.y - cs.y;
         const dist = Math.sqrt(dx * dx + dy * dy) || 1;
         const off = (meta.count === 1) ? Renderer.options.curvature : ((meta.index - (meta.count - 1) / 2) * 0.34);
-        const mx = (s.x + t.x) / 2 - dy / dist * off * dist;
-        const my = (s.y + t.y) / 2 + dx / dist * off * dist;
-        d = `M ${f(s.x)} ${f(s.y)} Q ${f(mx)} ${f(my)} ${f(t.x)} ${f(t.y)}`;
+        const mx = (cs.x + ct.x) / 2 - dy / dist * off * dist;
+        const my = (cs.y + ct.y) / 2 + dx / dist * off * dist;
+        d = `M ${f(cs.x)} ${f(cs.y)} Q ${f(mx)} ${f(my)} ${f(ct.x)} ${f(ct.y)}`;
       }
       parts.push(`<path d="${d}" fill="none" stroke="${esc(color)}" stroke-width="${f(width)}" stroke-dasharray="7 5" stroke-linecap="round"/>`);
       // 箭头（终点切线方向）
       if (st.arrow || Renderer.options.showArrow) {
         let ang;
         if (meta.selfLoop) {
-          const cx = s.x + Math.cos(-Math.PI / 4) * rr * 1.9, cy = s.y + Math.sin(-Math.PI / 4) * rr * 1.9;
-          ang = Math.atan2(s.y - cy, s.x - cx);
+          const cx = cs.x + Math.cos(-Math.PI / 4) * rr * 1.9, cy = cs.y + Math.sin(-Math.PI / 4) * rr * 1.9;
+          ang = Math.atan2(cs.y - cy, cs.x - cx);
         } else {
-          const dx = t.x - s.x, dy = t.y - s.y;
+          const dx = ct.x - cs.x, dy = ct.y - cs.y;
           const dist = Math.sqrt(dx * dx + dy * dy) || 1;
           const off = (meta.count === 1) ? Renderer.options.curvature : ((meta.index - (meta.count - 1) / 2) * 0.34);
-          const mx = (s.x + t.x) / 2 - dy / dist * off * dist;
-          const my = (s.y + t.y) / 2 + dx / dist * off * dist;
-          ang = Math.atan2(t.y - my, t.x - mx);
+          const mx = (cs.x + ct.x) / 2 - dy / dist * off * dist;
+          const my = (cs.y + ct.y) / 2 + dx / dist * off * dist;
+          ang = Math.atan2(ct.y - my, ct.x - mx);
         }
         const tr = Renderer.nodeRadius(t);
-        const ax = t.x - Math.cos(ang) * (tr + 2), ay = t.y - Math.sin(ang) * (tr + 2);
+        const ax = ct.x - Math.cos(ang) * (tr + 2), ay = ct.y - Math.sin(ang) * (tr + 2);
         const as = Math.max(7, width * 3);
         parts.push(`<polygon points="${f(ax)},${f(ay)} ${f(ax - Math.cos(ang - 0.42) * as)},${f(ay - Math.sin(ang - 0.42) * as)} ${f(ax - Math.cos(ang + 0.42) * as)},${f(ay - Math.sin(ang + 0.42) * as)}" fill="${esc(color)}"/>`);
       }
     }
 
-    // 边标签（与画布一致：全局开启且边数 ≤ 400）
-    if (Renderer.options.showEdgeLabels && visEdges.length <= 400) {
+    // 边标签（默认关闭：标签墙会严重挤压信息；导出中心可勾选开启，且边数 ≤ 400）
+    if (withLabels && visEdges.length <= 400) {
       const fs = Renderer.options.labelSize * 0.85;
       for (const { r, s, t } of visEdges) {
+        const cs = coords.get(s.id), ct = coords.get(t.id);
+        if (!cs || !ct) continue;
         const meta = Renderer._parallel.get(r.id) || { index: 0, count: 1, selfLoop: false };
         const st = r.style || {};
         const color = st.color || Utils.colorForType(r.relationType);
         let px, py;
         if (meta.selfLoop) {
-          px = s.x + 40; py = s.y - 40;
+          px = cs.x + 40; py = cs.y - 40;
         } else {
-          const dx = t.x - s.x, dy = t.y - s.y;
+          const dx = ct.x - cs.x, dy = ct.y - cs.y;
           const dist = Math.sqrt(dx * dx + dy * dy) || 1;
           const off = (meta.count === 1) ? Renderer.options.curvature : ((meta.index - (meta.count - 1) / 2) * 0.34);
-          const mx = (s.x + t.x) / 2 - dy / dist * off * dist;
-          const my = (s.y + t.y) / 2 + dx / dist * off * dist;
-          px = (s.x + 2 * mx + t.x) / 4; py = (s.y + 2 * my + t.y) / 4;
+          const mx = (cs.x + ct.x) / 2 - dy / dist * off * dist;
+          const my = (cs.y + ct.y) / 2 + dx / dist * off * dist;
+          px = (cs.x + 2 * mx + ct.x) / 4; py = (cs.y + 2 * my + ct.y) / 4;
         }
         const text = esc(r.relationType);
         const tw = (r.relationType || '').length * fs * 1.05 + 8;
@@ -1610,21 +1663,23 @@ const DataIO = {
       }
     }
 
-    // 人物节点：形状 + 名称（矢量文字永远清晰，导出时全部显示）
-    for (const p of GraphStore.persons) {
-      if (!GraphStore.isPersonVisible(p)) continue;
+    // 人物节点：形状 + 名称（矢量文字永远清晰；松弛后固定下方锚点，不再互相压盖）
+    const fs = nodeFs;
+    for (const p of vis) {
+      const c = coords.get(p.id);
       const st = p.style || {};
       const r = Renderer.nodeRadius(p);
       const border = st.border || (Renderer.options.colorByGroup && p.group ? Utils.colorForGroup(p.group) : th.nodeBorder);
       const fill = st.fill || th.nodeFill;
       if (st.shape === 'rect') {
         const rw = r * 1.7, rh = r * 1.3;
-        parts.push(`<rect x="${f(p.x - rw / 2)}" y="${f(p.y - rh / 2)}" width="${f(rw)}" height="${f(rh)}" rx="${f(Math.min(10, r * 0.4))}" fill="${esc(fill)}" stroke="${esc(border)}" stroke-width="${f(Math.max(1.5, r * 0.09))}"/>`);
+        parts.push(`<rect x="${f(c.x - rw / 2)}" y="${f(c.y - rh / 2)}" width="${f(rw)}" height="${f(rh)}" rx="${f(Math.min(10, r * 0.4))}" fill="${esc(fill)}" stroke="${esc(border)}" stroke-width="${f(Math.max(1.5, r * 0.09))}"/>`);
       } else {
-        parts.push(`<circle cx="${f(p.x)}" cy="${f(p.y)}" r="${f(r)}" fill="${esc(fill)}" stroke="${esc(border)}" stroke-width="${f(Math.max(1.5, r * 0.09))}"/>`);
+        parts.push(`<circle cx="${f(c.x)}" cy="${f(c.y)}" r="${f(r)}" fill="${esc(fill)}" stroke="${esc(border)}" stroke-width="${f(Math.max(1.5, r * 0.09))}"/>`);
       }
-      const fs = Renderer.options.labelSize;
-      parts.push(`<text x="${f(p.x)}" y="${f(p.y + r + fs * 0.95)}" font-size="${f(fs)}" fill="${esc(st.textColor || th.nodeText)}" text-anchor="middle" font-family="Microsoft YaHei, PingFang SC, sans-serif">${esc(p.name || '未命名')}</text>`);
+      const name = p.name || '未命名';
+      const tx = c.x, ty = c.y + r + 3;
+      parts.push(`<text x="${f(tx)}" y="${f(ty + fs * 0.9)}" font-size="${f(fs)}" fill="${esc(st.textColor || th.nodeText)}" text-anchor="middle" font-family="Microsoft YaHei, PingFang SC, sans-serif">${esc(name)}</text>`);
     }
 
     const svg = `<?xml version="1.0" encoding="UTF-8"?>\n` +
@@ -1632,7 +1687,7 @@ const DataIO = {
       `<rect x="${f(x0)}" y="${f(y0)}" width="${f(w)}" height="${f(h)}" fill="${esc(th.bg)}"/>` +
       parts.join('') +
       `</svg>`;
-    return { svg, w: Math.round(w), h: Math.round(h), edges: visEdges.length, persons: GraphStore.persons.length };
+    return { svg, w: Math.round(w), h: Math.round(h), edges: visEdges.length, persons: GraphStore.persons.length, labels: withLabels };
   },
 
   /* 极简 PDF 生成器：嵌入 JPEG（DCTDecode），无需第三方库 */

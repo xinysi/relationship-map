@@ -68,6 +68,35 @@ test('extract：多次提取人物 ID 前缀唯一（追加不冲突）', async 
   assert.ok(/^L[0-9a-z]+_/.test(a.persons[0].id), 'ID 带唯一前缀');
 });
 
+test('extract：首次空返回自动重试成功 / 数组 content 兼容', async () => {
+  const orig = globalThis.fetch;
+  const goodContent = JSON.stringify({ persons: [{ id: 'P1', name: '甲' }], relations: [], events: [] });
+  let call = 0;
+  globalThis.fetch = async () => {
+    call++;
+    if (call === 1) return new Response(JSON.stringify({ choices: [{ message: { content: '', finish_reason: 'length' } }] }), { status: 200 });
+    // 第二次数组格式 content
+    return new Response(JSON.stringify({ choices: [{ message: { content: [{ type: 'text', text: goodContent }] } }] }), { status: 200 });
+  };
+  LlmExtract.saveSettings({ llmKey: 'sk-x', llmBase: 'https://api.deepseek.com/v1', llmModel: 'deepseek-chat' });
+  const res = await LlmExtract.extract('文本');
+  globalThis.fetch = orig;
+  assert.equal(call, 2, '空返回后自动重试一次');
+  assert.equal(res.persons[0].name, '甲');
+});
+
+test('extract：两次都空返回时抛出诊断信息', async () => {
+  const orig = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({ choices: [{ message: { content: '', finish_reason: 'length' } }] }), { status: 200 });
+  LlmExtract.saveSettings({ llmKey: 'sk-x', llmBase: 'https://api.deepseek.com/v1', llmModel: 'deepseek-chat' });
+  await assert.rejects(LlmExtract.extract('文本'), (e) => {
+    assert.ok(e.message.includes('诊断'), '含诊断信息');
+    assert.ok(e.message.includes('首次返回 0 字符'), '含首次长度');
+    return true;
+  });
+  globalThis.fetch = orig;
+});
+
 test('settings 默认值与合并', () => {
   LlmExtract.saveSettings({ llmKey: '' });
   const s = LlmExtract.settings();

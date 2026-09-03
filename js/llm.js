@@ -47,6 +47,59 @@ JSON 结构：
 5. 只抽取文本中真实出现的人物与关系，不要臆测；没有内容时输出 {"persons": [], "relations": [], "events": []}`;
   },
 
+  /* 单次 chat/completions 请求，返回 {content, finishReason}；
+     opts.noFormat 时去掉 response_format（兼容不支持该参数的服务） */
+  async _chat(s, text, opts) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 120000);
+    const messages = [
+      { role: 'system', content: this._buildSystemPrompt() },
+      { role: 'user', content: this._buildUserPrompt(text) }
+    ];
+    if (opts && opts.noFormat) {
+      messages[0].content += '\n特别要求：只输出 JSON 对象本身，不要输出推理过程、解释、Markdown 代码块或任何附加文字。';
+    }
+    const req = {
+      model: s.llmModel,
+      temperature: 0.2,
+      max_tokens: 8192,
+      messages
+    };
+    if (!(opts && opts.noFormat)) req.response_format = { type: 'json_object' };
+    let resp;
+    try {
+      resp = await fetch(s.llmBase.replace(/\/+$/, '') + '/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + s.llmKey
+        },
+        body: JSON.stringify(req),
+        signal: controller.signal
+      });
+    } catch (e) {
+      clearTimeout(timer);
+      if (e.name === 'AbortError') throw new Error('AI 请求超时（120 秒），请重试或换更小段文本');
+      throw new Error('无法连接 AI 服务：' + (e.message || '网络错误') + '。请检查服务地址是否支持浏览器直连（CORS）');
+    }
+    clearTimeout(timer);
+    if (!resp.ok) {
+      let detail = '';
+      try { detail = (await resp.text()).slice(0, 160); } catch (e) { /* ignore */ }
+      throw new Error(`AI 服务返回错误（HTTP ${resp.status}）${detail ? '：' + detail : '。请检查密钥/模型名是否正确'}`);
+    }
+    const data = await resp.json();
+    const msg = (data && data.choices && data.choices[0] && data.choices[0].message) || {};
+    let content = '';
+    if (Array.isArray(msg.content)) {
+      // 多模态格式：content 可能为 [{type:'text',text:...}] 数组
+      content = msg.content.map(x => (typeof x === 'string' ? x : (x && x.text != null ? x.text : ''))).join('');
+    } else if (msg.content != null) {
+      content = String(msg.content);
+    }
+    return { content, finishReason: (data.choices && data.choices[0] && data.choices[0].finish_reason) || '' };
+  },
+
   /* 用户消息：截断超长文本 */
   _buildUserPrompt(text) {
     const MAX = 15000;
@@ -64,48 +117,22 @@ JSON 结构：
     if (!s.llmBase || !s.llmModel) throw new Error('AI 服务地址或模型未配置，请检查设置');
 
     if (onProgress) onProgress(0.1, '正在请求 AI 服务…');
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 120000);
-    let resp;
-    try {
-      resp = await fetch(s.llmBase.replace(/\/+$/, '') + '/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + s.llmKey
-        },
-        body: JSON.stringify({
-          model: s.llmModel,
-          temperature: 0.2,
-          max_tokens: 8192,
-          response_format: { type: 'json_object' },
-          messages: [
-            { role: 'system', content: this._buildSystemPrompt() },
-            { role: 'user', content: this._buildUserPrompt(text) }
-          ]
-        }),
-        signal: controller.signal
-      });
-    } catch (e) {
-      clearTimeout(timer);
-      if (e.name === 'AbortError') throw new Error('AI 请求超时（120 秒），请重试或换更小段文本');
-      throw new Error('无法连接 AI 服务：' + (e.message || '网络错误') + '。请检查服务地址是否支持浏览器直连（CORS）');
-    }
-    clearTimeout(timer);
-    if (!resp.ok) {
-      let detail = '';
-      try { detail = (await resp.text()).slice(0, 160); } catch (e) { /* ignore */ }
-      throw new Error(`AI 服务返回错误（HTTP ${resp.status}）${detail ? '：' + detail : '。请检查密钥/模型名是否正确'}`);
-    }
-    if (onProgress) onProgress(0.6, '正在解析 AI 返回结果…');
-    const data = await resp.json();
-    const content = data && data.choices && data.choices[0] && data.choices[0].message
-      ? data.choices[0].message.content : '';
-    const parsed = this.parseModelReply(content);
+    const first = await this._chat(s, text, {});
+    let content = first.content;
+    let parsed = this.parseModelReply(content);
     if (!parsed) {
-      const head = String(content || '').replace(/\s+/g, ' ').slice(0, 80);
-      throw new Error(`AI 返回内容无法解析为 JSON，请重试。（返回开头：「${head}…」；若反复失败请换模型或缩短文本）`);
+      // 空返回/解析失败：自动重试一次（去掉 response_format 兼容性限制，并强调纯 JSON 输出）
+      if (onProgress) onProgress(0.7, '结果不完整，正在重试…');
+      const second = await this._chat(s, text, { noFormat: true });
+      parsed = this.parseModelReply(second.content);
+      if (parsed) content = second.content;
+      if (!parsed) {
+        const head = String(content || '').replace(/\s+/g, ' ').slice(0, 80);
+        const diag = `诊断：首次返回 ${first.content.length} 字符（finish=${first.finishReason || '无'}），重试返回 ${second.content.length} 字符（finish=${second.finishReason || '无'}）`;
+        throw new Error(`AI 返回内容无法解析为 JSON，请重试。${diag}。返回开头：「${head || '（空）'}…」。若反复失败请换模型（确认支持 JSON 输出）或缩短文本`);
+      }
     }
+    if (onProgress) onProgress(0.85, '解析完成');
     // 每次提取使用唯一 ID 前缀：防止多次"追加"导入时 ID 互相冲突（LLMP1 撞 LLMP1）
     const token = 'L' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6) + '_';
     // 字段规范化（适配本应用模型）

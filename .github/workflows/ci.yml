@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Syntax check (all JS)
+        run: |
+          for f in $(find js -name '*.js' -not -path 'js/vendor/*'); do
+            node --check "$f" || exit 1
+          done
+
+      - name: Run unit tests
+        run: node --test

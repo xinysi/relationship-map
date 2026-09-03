@@ -160,6 +160,12 @@ rwgxw/
 - 性能：力导向布局分帧执行不冻结 UI；渲染层视口裁剪 + 样式分桶批量描边 + 大数据自动隐藏标签；3000 节点 / 9000 关系实测力导向约 4 秒、其余 5 种布局 <40ms
 - 数据结构遵循 PRD 第 10 章定义（节点含 x/y 坐标与 style 持久化，工程文件可完整恢复编辑状态）
 
+## 🧪 开发与测试
+
+- **测试**：`npm test`（Node 22+ 内置 test runner，零依赖）。覆盖数据模型（净化/CRUD/撤销栈/固定聚焦）、导入导出（CSV 公式注入防护、Markdown 解析与强度推断、JSON/CSV 导入、info 级别分离）、6 种布局（坐标有效性 / 深链防爆栈 / 力导向收敛）、渲染上下文（pinned 优先、主题完整性）
+- **CI**：GitHub Actions（`.github/workflows/ci.yml`）在每次 push / PR 时自动执行 JS 语法检查 + 单元测试
+- **维护提示**：`sl/` 私人剧情文档在本地保留（`.gitignore` 保护），更新后运行 `python _gen_doc.py` 再生成本地内置演示（不随仓库分发）
+
 ## 📄 许可
 
 [MIT](LICENSE)（Copyright © 2026 xinysi）。内置的 `js/vendor/xlsx.full.min.js`（SheetJS 社区版）遵循其自身的 Apache-2.0 许可，详见 LICENSE 中的第三方声明。

@@ -115,16 +115,13 @@ rwgxw/
 │   ├── vendor/xlsx.full.min.js  # SheetJS 离线库（Excel 解析）
 │   ├── utils.js            # 通用工具
 │   ├── sample-data.js      # 内置示例数据（三国人物）
-│   ├── grimtales-doc.js    # 内置剧情文档示例（由 sl/ 生成，_gen_doc.py）
 │   ├── model.js            # 数据模型（CRUD/撤销重做/筛选/溯源/时间线事件）
-│   ├── layout.js           # 四种布局算法
+│   ├── layout.js           # 六种布局算法
 │   ├── renderer.js         # Canvas 渲染引擎（绘制/命中检测/导出复用）
 │   ├── io.js               # 导入导出（Excel/CSV/JSON/Markdown/图片/PDF/加密工程文件）
 │   ├── storage.js          # 本地存储（IndexedDB 工程库/设置/会话恢复）
 │   └── app.js              # UI 交互层（弹窗/画布交互/时间轴面板/快捷键/工程管理）
 ├── sample/                 # 示例数据（人物信息表.csv / 关系信息表.csv）
-├── sl/                     # 剧情文档解析示例（Markdown 源文档）
-├── _gen_doc.py             # 剧情文档内嵌构建脚本（更新 sl/ 后重新运行）
 └── 人物关系网软件需求规格说明书（PRD）.md
 ```
 

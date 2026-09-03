@@ -1678,6 +1678,9 @@ const DataIO = {
         parts.push(`<circle cx="${f(c.x)}" cy="${f(c.y)}" r="${f(r)}" fill="${esc(fill)}" stroke="${esc(border)}" stroke-width="${f(Math.max(1.5, r * 0.09))}"/>`);
       }
       const name = p.name || '未命名';
+      // 圆内首字（与画布一致：无头像节点在中心绘制名字首字）
+      const charFs = Math.max(11, r * 0.75);
+      parts.push(`<text x="${f(c.x)}" y="${f(c.y + charFs * 0.35)}" font-size="${f(charFs)}" font-weight="600" fill="${esc(border)}" opacity="0.75" text-anchor="middle" font-family="Microsoft YaHei, PingFang SC, sans-serif">${esc(name.charAt(0))}</text>`);
       const tx = c.x, ty = c.y + r + 3;
       parts.push(`<text x="${f(tx)}" y="${f(ty + fs * 0.9)}" font-size="${f(fs)}" fill="${esc(st.textColor || th.nodeText)}" text-anchor="middle" font-family="Microsoft YaHei, PingFang SC, sans-serif">${esc(name)}</text>`);
     }

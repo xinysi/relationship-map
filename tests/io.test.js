@@ -85,7 +85,7 @@ test('SVG 矢量文档：默认无标签墙 + 选项生效 + XSS 转义', () => 
   assert.ok(doc && doc.svg.startsWith('<?xml'));
   assert.equal((doc.svg.match(/<circle/g) || []).length, GraphStore.persons.length, '每节点一个 circle');
   assert.ok(doc.svg.includes('<path'), '关系边为 path');
-  assert.ok(doc.svg.includes('<text'), '含节点名文字');
+  assert.ok((doc.svg.match(/<text/g) || []).length >= GraphStore.persons.length * 2, '每个节点有首字 + 名称');
   // 默认不导出边标签（避免标签墙拥挤），勾选后包含
   assert.equal((doc.svg.match(/rx="4"/g) || []).length, 0, '默认无边标签');
   const docL = DataIO._svgDocument({ labels: true });

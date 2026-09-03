@@ -1454,6 +1454,11 @@ const App = {
           <button class="btn" data-act="csv">CSV（两张表）</button>
           <button class="btn" data-act="xlsx">Excel</button>
         </div>
+        <div class="dt-section-title">分享发布（单文件，对方双击即看）</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button class="btn" data-act="share">📤 只读分享页（单文件 HTML）</button>
+          <span class="form-hint" style="margin:0">含交互：缩放 / 悬浮 / 点击聚焦 / 时间轴</span>
+        </div>
         <div class="dt-section-title">工程文件（包含节点位置 / 样式 / 布局信息，可恢复编辑状态）</div>
         <div class="form-row" style="align-items:flex-end">
           <div class="form-item"><label>加密密码（可选，留空则不加密）</label>
@@ -1482,6 +1487,14 @@ const App = {
     m.body.parentElement.querySelector('[data-act=json]').onclick = () => { if (imgGuard()) { DataIO.exportDataJSON(); this.toast('JSON 源数据已导出', 'success'); } };
     m.body.parentElement.querySelector('[data-act=csv]').onclick = () => { if (imgGuard()) { DataIO.exportDataCSV(); this.toast('CSV 源数据已导出（两张表）', 'success'); } };
     m.body.parentElement.querySelector('[data-act=xlsx]').onclick = () => { if (imgGuard()) { const r = DataIO.exportDataXLSX(); if (r && r.ok) this.toast('Excel 源数据已导出', 'success'); } };
+    m.body.parentElement.querySelector('[data-act=share]').onclick = () => {
+      if (imgGuard()) {
+        const html = SharePage.build();
+        Utils.download(`${GraphStore.projectName}-分享页.html`, new Blob([html], { type: 'text/html;charset=utf-8' }), 'text/html');
+        GraphStore.log('导出只读分享页');
+        this.toast('只读分享页已导出（单文件，可直接发送给他人）', 'success');
+      }
+    };
     m.body.parentElement.querySelector('[data-act=project]').onclick = async () => {
       const pwd = q('#expPwd').value;
       try {

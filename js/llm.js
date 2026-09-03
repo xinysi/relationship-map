@@ -106,12 +106,14 @@ JSON 结构：
       const head = String(content || '').replace(/\s+/g, ' ').slice(0, 80);
       throw new Error(`AI 返回内容无法解析为 JSON，请重试。（返回开头：「${head}…」；若反复失败请换模型或缩短文本）`);
     }
+    // 每次提取使用唯一 ID 前缀：防止多次"追加"导入时 ID 互相冲突（LLMP1 撞 LLMP1）
+    const token = 'L' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6) + '_';
     // 字段规范化（适配本应用模型）
     const persons = [];
     const idMap = new Map(); // LLM id → 应用 id
     for (const p of parsed.persons || []) {
       if (!p || !p.name) continue;
-      const id = 'LLM' + String(p.id || ('P' + (persons.length + 1))).replace(/[^A-Za-z0-9_]/g, '');
+      const id = token + String(p.id || ('P' + (persons.length + 1))).replace(/[^A-Za-z0-9_]/g, '');
       idMap.set(String(p.id), id);
       persons.push({
         id,

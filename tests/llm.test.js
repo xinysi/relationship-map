@@ -55,6 +55,19 @@ test('extract 前的配置检查与空文本提示', async () => {
   await assert.rejects(LlmExtract.extract('一些文本'), /尚未配置 AI 服务密钥/);
 });
 
+test('extract：多次提取人物 ID 前缀唯一（追加不冲突）', async () => {
+  const orig = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    choices: [{ message: { content: JSON.stringify({ persons: [{ id: 'P1', name: '甲' }], relations: [], events: [] }) } }]
+  }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  LlmExtract.saveSettings({ llmKey: 'sk-x', llmBase: 'https://api.deepseek.com/v1', llmModel: 'deepseek-chat' });
+  const a = await LlmExtract.extract('甲…');
+  const b = await LlmExtract.extract('甲…');
+  globalThis.fetch = orig;
+  assert.notEqual(a.persons[0].id, b.persons[0].id, '两次提取 ID 不得相同');
+  assert.ok(/^L[0-9a-z]+_/.test(a.persons[0].id), 'ID 带唯一前缀');
+});
+
 test('settings 默认值与合并', () => {
   LlmExtract.saveSettings({ llmKey: '' });
   const s = LlmExtract.settings();

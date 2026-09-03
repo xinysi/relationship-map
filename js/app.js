@@ -1400,10 +1400,22 @@ const App = {
             </select>
             <button class="btn primary" data-act="apply">应用提取结果</button>
           </div>`;
-        result.querySelector('[data-act=apply]').onclick = () => {
+        result.querySelector('[data-act=apply]').onclick = async () => {
           const mode = result.querySelector('#llmMode').value;
-          const applied = DataIO.applyImport({ persons: res.persons, relations: res.relations, events: res.events, errors: [], fileName: 'AI 提取' }, mode);
-          this.toast(`已应用：人物 ${applied.persons} · 关系 ${applied.relations}${applied.events ? ' · 事件 ' + applied.events : ''}${orphan ? `（${orphan} 条无效引用跳过）` : ''}`, 'success');
+          // 构造内存 JSON 文件复用 DataIO.parseFiles 的追加管线：
+          // 追加模式下自动完成「ID 去重 + 按姓名/别名合并 + 关系端点重映射」，
+          // 与导入 MD/CSV 追加行为一致，避免重复 ID 导致人物丢失/覆盖
+          const file = new File([JSON.stringify({ persons: res.persons, relations: res.relations, events: res.events })], 'ai-extract.json', { type: 'application/json' });
+          let parsed;
+          try {
+            parsed = await DataIO.parseFiles([file], { mode }, () => {});
+          } catch (e) {
+            this.toast(e.message || '应用失败', 'error');
+            return;
+          }
+          const applied = DataIO.applyImport(parsed, mode);
+          const errs = (parsed.errors || []).filter(e => e.level !== 'info').length;
+          this.toast(`已应用：人物 ${applied.persons} · 关系 ${applied.relations}${applied.events ? ' · 事件 ' + applied.events : ''}${errs ? `（${errs} 条跳过/警告）` : ''}`, 'success');
           m.close();
         };
       } catch (e) {

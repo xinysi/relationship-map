@@ -74,6 +74,27 @@ test('JSON 导入：中英键兼容', async () => {
   assert.equal(parsed.relations[0].strength, 6);
 });
 
+test('追加导入：同名人物自动合并 + 关系端点重映射', async () => {
+  GraphStore.init();
+  GraphStore.addPerson({ id: 'EXIST', name: '安娜·格雷', alias: 'Anna' }, { silent: true });
+  GraphStore.reindex();
+  const parsed = await DataIO.parseFiles([
+    new File([JSON.stringify({
+      persons: [
+        { id: 'LLMP1', name: '安娜·格雷' },
+        { id: 'LLMP2', name: '路易莎' }
+      ],
+      relations: [{ sourceId: 'LLMP1', targetId: 'LLMP2', relationType: '姐妹', strength: 8 }]
+    })], 'x.json', { type: 'application/json' })
+  ], { mode: 'append' }, () => {});
+  const applied = DataIO.applyImport(parsed, 'append');
+  assert.equal(applied.persons, 1, '同名安娜合并（仅新增路易莎）');
+  assert.equal(GraphStore.persons.length, 2);
+  const rel = GraphStore.relations.find(r => r.relationType === '姐妹');
+  assert.equal(rel.sourceId, 'EXIST', '关系端点重映射到已有人物');
+  assert.equal(rel.targetId, GraphStore.persons.find(p => p.name === '路易莎').id);
+});
+
 test('SVG 矢量文档：默认无标签墙 + 选项生效 + XSS 转义', () => {
   const { SampleData, Renderer } = load();
   GraphStore.init();

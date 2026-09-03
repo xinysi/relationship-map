@@ -93,17 +93,22 @@ const Layouts = {
     }
   },
 
-  /* ---------- 力导向布局（默认）：节点排斥 + 关系线自适应拉伸 ---------- */
+  /* ---------- 力导向布局（默认）：节点排斥 + 关系线自适应拉伸 ----------
+     Web Worker（Blob URL）优先计算，file:// 或 Worker 不可用时自动降级主线程算法 */
   async force(persons, relations, onProgress) {
     const n = persons.length;
     if (!n) return;
-    const idx = new Map();
-    persons.forEach((p, i) => idx.set(p.id, i));
+    try {
+      if (await this._forceViaWorker(persons, relations, onProgress || null)) return;
+    } catch (e) { /* 降级到主线程 */ }
+    await this._forceMain(persons, relations, onProgress || null);
+  },
 
+  /* 初始化布局状态：p/lock 与初始位置（旧位置优先，否则环形随机撒点） */
+  _forceInit(persons) {
+    const n = persons.length;
     const px = new Float64Array(n), py = new Float64Array(n);
-    const vx = new Float64Array(n), vy = new Float64Array(n);
     const locked = new Uint8Array(n);
-
     let hasOldPos = false;
     for (let i = 0; i < n; i++) {
       const p = persons[i];
@@ -119,59 +124,86 @@ const Layouts = {
         py[i] = Math.sin(a) * r0 * (0.6 + Math.random() * 0.5);
       }
     }
+    return { px, py, locked };
+  },
 
+  /* 关系边预解码为 [a, b, strength] 索引三元组，避免 tick 内反复 Map 查找 */
+  _decodeEdges(persons, relations) {
+    const idx = new Map();
+    persons.forEach((p, i) => idx.set(p.id, i));
+    const edges = [];
+    for (const r of relations) {
+      const a = idx.get(r.sourceId), b = idx.get(r.targetId);
+      if (a != null && b != null && a !== b) edges.push([a, b, r.strength || 5]);
+    }
+    return edges;
+  },
+
+  /* 精确排斥（小图分支，主线程与 Worker 共用同一实现） */
+  _repulsionExact(px, py, fx, fy, n, dist, k2) {
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        let dx = px[i] - px[j], dy = py[i] - py[j];
+        let d2 = dx * dx + dy * dy;
+        if (d2 < 1) { dx = (Math.random() - 0.5) * 2; dy = (Math.random() - 0.5) * 2; d2 = 4; }
+        if (d2 > k2 * 25) continue; // 距离过远时忽略，控制计算量
+        const d = Math.sqrt(d2);
+        let f = k2 / d2;
+        if (f > dist * 0.06) f = dist * 0.06;
+        const ux = dx / d * f, uy = dy / d * f;
+        fx[i] += ux; fy[i] += uy;
+        fx[j] -= ux; fy[j] -= uy;
+      }
+    }
+  },
+
+  /* 力导向单 tick 计算（纯函数）：排斥 + 弹簧 + 向心力/积分，返回动能用于收敛判断 */
+  _forceTick(px, py, vx, vy, locked, edges, n, dist, k2, repulsion, alpha) {
+    const fx = new Float64Array(n), fy = new Float64Array(n);
+    repulsion(px, py, fx, fy, n, dist, k2);
+
+    // 关系边弹簧引力：强度越高距离越近
+    for (const e of edges) {
+      const a = e[0], b = e[1];
+      const dx = px[b] - px[a], dy = py[b] - py[a];
+      const d = Math.sqrt(dx * dx + dy * dy) || 0.01;
+      const rest = dist * (1.5 - 0.07 * e[2]);
+      const f = (d - rest) * 0.02;
+      const ux = dx / d * f, uy = dy / d * f;
+      fx[a] += ux; fy[a] += uy;
+      fx[b] -= ux; fy[b] -= uy;
+    }
+
+    // 向心力 + 积分
+    let energy = 0;
+    for (let i = 0; i < n; i++) {
+      fx[i] -= px[i] * 0.012; fy[i] -= py[i] * 0.012;
+      vx[i] = (vx[i] + fx[i] * alpha) * 0.82;
+      vy[i] = (vy[i] + fy[i] * alpha) * 0.82;
+      const sp = Math.sqrt(vx[i] * vx[i] + vy[i] * vy[i]);
+      if (sp > dist * 0.4) { vx[i] *= dist * 0.4 / sp; vy[i] *= dist * 0.4 / sp; }
+      energy += vx[i] * vx[i] + vy[i] * vy[i];
+      if (!locked[i]) { px[i] += vx[i]; py[i] += vy[i]; }
+    }
+    return energy;
+  },
+
+  /* 主线程力导向（降级路径，与原算法逐参数一致，分帧执行避免卡顿） */
+  async _forceMain(persons, relations, onProgress) {
+    const n = persons.length;
+    const { px, py, locked } = this._forceInit(persons);
+    const vx = new Float64Array(n), vy = new Float64Array(n);
+    const edges = this._decodeEdges(persons, relations);
     const dist = Utils.clamp(2400 / Math.sqrt(n), 110, 300); // 理想间距
     const k2 = dist * dist;
     const maxTicks = n > 600 ? 220 : (n > 200 ? 280 : 340);
+    const repulsion = (px2, py2, fx, fy, n2, d, k) => {
+      if (n2 > 240) this._repulsionGrid(px2, py2, fx, fy, n2, d, k);
+      else this._repulsionExact(px2, py2, fx, fy, n2, d, k);
+    };
     let alpha = 1;
-
     for (let tick = 0; tick < maxTicks; tick++) {
-      const fx = new Float64Array(n), fy = new Float64Array(n);
-
-      // 节点间排斥（库仑力，按距离平方衰减并截断）
-      if (n > 240) this._repulsionGrid(px, py, fx, fy, n, dist, k2);
-      else {
-        for (let i = 0; i < n; i++) {
-          for (let j = i + 1; j < n; j++) {
-            let dx = px[i] - px[j], dy = py[i] - py[j];
-            let d2 = dx * dx + dy * dy;
-            if (d2 < 1) { dx = (Math.random() - 0.5) * 2; dy = (Math.random() - 0.5) * 2; d2 = 4; }
-            if (d2 > k2 * 25) continue; // 距离过远时忽略，控制计算量
-            const d = Math.sqrt(d2);
-            let f = k2 / d2;
-            if (f > dist * 0.06) f = dist * 0.06;
-            const ux = dx / d * f, uy = dy / d * f;
-            fx[i] += ux; fy[i] += uy;
-            fx[j] -= ux; fy[j] -= uy;
-          }
-        }
-      }
-
-      // 关系边弹簧引力：强度越高距离越近
-      for (const r of relations) {
-        const a = idx.get(r.sourceId), b = idx.get(r.targetId);
-        if (a == null || b == null || a === b) continue;
-        const dx = px[b] - px[a], dy = py[b] - py[a];
-        const d = Math.sqrt(dx * dx + dy * dy) || 0.01;
-        const rest = dist * (1.5 - 0.07 * (r.strength || 5));
-        const f = (d - rest) * 0.02;
-        const ux = dx / d * f, uy = dy / d * f;
-        fx[a] += ux; fy[a] += uy;
-        fx[b] -= ux; fy[b] -= uy;
-      }
-
-      // 向心力 + 积分
-      let energy = 0;
-      for (let i = 0; i < n; i++) {
-        fx[i] -= px[i] * 0.012; fy[i] -= py[i] * 0.012;
-        vx[i] = (vx[i] + fx[i] * alpha) * 0.82;
-        vy[i] = (vy[i] + fy[i] * alpha) * 0.82;
-        const sp = Math.sqrt(vx[i] * vx[i] + vy[i] * vy[i]);
-        if (sp > dist * 0.4) { vx[i] *= dist * 0.4 / sp; vy[i] *= dist * 0.4 / sp; }
-        energy += vx[i] * vx[i] + vy[i] * vy[i];
-        if (!locked[i]) { px[i] += vx[i]; py[i] += vy[i]; }
-      }
-
+      const energy = this._forceTick(px, py, vx, vy, locked, edges, n, dist, k2, repulsion, alpha);
       alpha *= 0.982;
       if (energy / n < 0.04 && tick > 60) break; // 0.02→0.04：收敛末期视觉差异极小，可省 20%+ tick
       if (tick % 4 === 0) {
@@ -179,9 +211,83 @@ const Layouts = {
         await Utils.nextFrame(); // 分帧计算，避免界面卡顿
       }
     }
-
     for (let i = 0; i < n; i++) { persons[i].x = px[i]; persons[i].y = py[i]; }
     if (onProgress) onProgress(1);
+  },
+
+  /* Worker 源码：字符串化共用纯函数（_forceTick/_repulsionGrid/_repulsionExact），
+     主线程与 Worker 运行同一套计算逻辑，避免实现漂移 */
+  _forceWorkerCode() {
+    const b64 = (fn) => fn.toString();
+    const tick = b64(this._forceTick).replace(/^_forceTick\s*\(/, 'function forceTick(');
+    const grid = b64(this._repulsionGrid).replace(/^_repulsionGrid\s*\(/, 'function repulsionGrid(');
+    const exact = b64(this._repulsionExact).replace(/^_repulsionExact\s*\(/, 'function repulsionExact(');
+    return `${tick}
+${grid}
+${exact}
+function run(data) {
+  const n = data.n, px = data.px, py = data.py;
+  const vx = new Float64Array(n), vy = new Float64Array(n);
+  const locked = data.locked, edges = data.edges;
+  const dist = data.dist, k2 = data.k2, maxTicks = data.maxTicks;
+  const repulsion = function (px2, py2, fx, fy, n2, d, k) {
+    if (n2 > 240) repulsionGrid(px2, py2, fx, fy, n2, d, k);
+    else repulsionExact(px2, py2, fx, fy, n2, d, k);
+  };
+  let alpha = 1;
+  for (let tick = 0; tick < maxTicks; tick++) {
+    const energy = forceTick(px, py, vx, vy, locked, edges, n, dist, k2, repulsion, alpha);
+    alpha *= 0.982;
+    if (energy / n < 0.04 && tick > 60) break;
+    if (tick % 8 === 0) postMessage({ type: 'progress', t: tick / maxTicks });
+  }
+  const out = new Float64Array(n * 2);
+  for (let i = 0; i < n; i++) { out[i * 2] = px[i]; out[i * 2 + 1] = py[i]; }
+  postMessage({ type: 'done', positions: out }, [out.buffer]);
+}
+onmessage = function (ev) { run(ev.data); };
+`;
+  },
+
+  /* Worker 计算路径：ArrayBuffer 零拷贝传输；任何失败返回 false 由上层降级 */
+  async _forceViaWorker(persons, relations, onProgress) {
+    const n = persons.length;
+    if (typeof Worker === 'undefined' || typeof Blob === 'undefined') return false;
+    let worker = null;
+    try {
+      worker = new Worker(URL.createObjectURL(new Blob([this._forceWorkerCode()], { type: 'application/javascript' })));
+    } catch (e) { return false; }
+
+    const { px, py, locked } = this._forceInit(persons);
+    const edges = this._decodeEdges(persons, relations);
+    const dist = Utils.clamp(2400 / Math.sqrt(n), 110, 300);
+    const k2 = dist * dist;
+    const maxTicks = n > 600 ? 220 : (n > 200 ? 280 : 340);
+
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = (ok) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        try { worker.terminate(); } catch (e) { /* ignore */ }
+        resolve(ok);
+      };
+      const timer = setTimeout(() => finish(false), 120000); // 兜底：worker 无响应则降级
+      worker.onerror = () => finish(false);
+      worker.onmessage = (ev) => {
+        const d = ev.data;
+        if (d.type === 'progress') { if (onProgress) onProgress(d.t); return; }
+        if (d.type === 'done') {
+          const out = d.positions;
+          for (let i = 0; i < n; i++) { persons[i].x = out[i * 2]; persons[i].y = out[i * 2 + 1]; }
+          if (onProgress) onProgress(1);
+          Layouts._forceViaWorkerCount = (Layouts._forceViaWorkerCount || 0) + 1; // 诊断计数
+          finish(true);
+        }
+      };
+      worker.postMessage({ type: 'start', n, px, py, locked, edges, dist, k2, maxTicks }, [px.buffer, py.buffer, locked.buffer]);
+    });
   },
 
   /* ---------- 环形布局：按分组排序后依次上环 ---------- */

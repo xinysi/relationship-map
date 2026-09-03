@@ -77,7 +77,7 @@ JSON 结构：
         body: JSON.stringify({
           model: s.llmModel,
           temperature: 0.2,
-          max_tokens: 4000,
+          max_tokens: 8192,
           response_format: { type: 'json_object' },
           messages: [
             { role: 'system', content: this._buildSystemPrompt() },
@@ -102,7 +102,10 @@ JSON 结构：
     const content = data && data.choices && data.choices[0] && data.choices[0].message
       ? data.choices[0].message.content : '';
     const parsed = this.parseModelReply(content);
-    if (!parsed) throw new Error('AI 返回内容无法解析为 JSON，请重试');
+    if (!parsed) {
+      const head = String(content || '').replace(/\s+/g, ' ').slice(0, 80);
+      throw new Error(`AI 返回内容无法解析为 JSON，请重试。（返回开头：「${head}…」；若反复失败请换模型或缩短文本）`);
+    }
     // 字段规范化（适配本应用模型）
     const persons = [];
     const idMap = new Map(); // LLM id → 应用 id
@@ -145,19 +148,41 @@ JSON 结构：
     return { persons, relations, events, raw: parsed };
   },
 
-  /* 容错解析模型回复：剥 ```json 代码块/前后废话，提取首个 { ... } */
+  /* 容错解析模型回复：字符串感知括号配对扫描，逐个候选对象尝试。
+     处理：```json 围栏、前后废话、字符串内含 {} 干扰、JSON 后附加收尾句。
+     返回首个可解析的顶层对象；全部失败返回 null。 */
   parseModelReply(content) {
     let text = String(content || '').trim();
     if (!text) return null;
-    // 剥代码块围栏
     text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
-    const start = text.indexOf('{');
-    const end = text.lastIndexOf('}');
-    if (start < 0 || end <= start) return null;
-    try {
-      const obj = JSON.parse(text.slice(start, end + 1));
-      if (obj && typeof obj === 'object') return obj;
-    } catch (e) { /* fallthrough */ }
+    for (let start = 0; start < text.length; start++) {
+      if (text[start] !== '{') continue;
+      let depth = 0, inStr = false, esc = false;
+      for (let i = start; i < text.length; i++) {
+        const ch = text[i];
+        if (inStr) {
+          if (esc) esc = false;
+          else if (ch === '\\') esc = true;
+          else if (ch === '"') inStr = false;
+          continue;
+        }
+        if (ch === '"') inStr = true;
+        else if (ch === '{') depth++;
+        else if (ch === '}') {
+          depth--;
+          if (depth === 0) {
+            try {
+              const obj = JSON.parse(text.slice(start, i + 1));
+              // 契约：顶层对象必须含抽取 schema 键（persons/relations/events），
+              // 拒绝截断时偶然闭合的内层碎片（如单个 person 对象）
+              if (obj && typeof obj === 'object' && !Array.isArray(obj) &&
+                  ('persons' in obj || 'relations' in obj || 'events' in obj)) return obj;
+            } catch (e) { /* 该候选失败，继续下一候选 */ }
+            break;
+          }
+        }
+      }
+    }
     return null;
   }
 };

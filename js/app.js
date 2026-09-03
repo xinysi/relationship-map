@@ -318,6 +318,7 @@ const App = {
       case 'layout-tree': this.relayout('tree'); break;
       case 'layout-grid': this.relayout('grid'); break;
       case 'layout-grouped': this.relayout('grouped'); break;
+      case 'layout-community': this.relayout('community'); break;
       case 'layout-radial': this.relayout('radial'); break;
       case 'zoomIn': Renderer.zoomAt(Renderer.w / 2, Renderer.h / 2, 1.2); break;
       case 'zoomOut': Renderer.zoomAt(Renderer.w / 2, Renderer.h / 2, 1 / 1.2); break;
@@ -441,7 +442,7 @@ const App = {
     let progress = null;
     if (!silent && GraphStore.persons.length > 60) progress = this.showProgressModal('自动布局计算中');
     try {
-      GraphStore.pushUndo('切换' + ({ force: '力导向', circular: '环形', tree: '层级树状', grid: '网格', grouped: '分簇', radial: '放射状' }[name] || '') + '布局');
+      GraphStore.pushUndo('切换' + ({ force: '力导向', circular: '环形', tree: '层级树状', grid: '网格', grouped: '分簇', community: '自动分簇', radial: '放射状' }[name] || '') + '布局');
       await Layouts.apply(name, (t) => { Renderer.requestDraw(); if (progress) { progress.update(t, '力导向布局迭代计算中… ' + Math.round(t * 100) + '%'); } });
       Renderer.fitView();
       GraphStore.dirty = true;
@@ -1445,6 +1446,7 @@ const App = {
               <button class="btn" data-act="jpg">JPG 图片</button>
               <button class="btn" data-act="pngt">透明底 PNG</button>
               <button class="btn primary" data-act="pdf">PDF 文件</button>
+              <button class="btn" data-act="svg">SVG 矢量图</button>
             </div></div>
         </div>
         <div class="dt-section-title">源数据导出（可二次修改 / 存档 / 复用）</div>
@@ -1472,6 +1474,12 @@ const App = {
     m.body.parentElement.querySelector('[data-act=jpg]').onclick = async () => { if (imgGuard()) { const r = await DataIO.exportImage('jpg', scale()); if (r && r.ok) this.toast(`JPG 已导出（${r.w}×${r.h}）`, 'success'); } };
     m.body.parentElement.querySelector('[data-act=pngt]').onclick = async () => { if (imgGuard()) { const r = await DataIO.exportImage('png-transparent', scale()); if (r && r.ok) this.toast(`透明底 PNG 已导出（${r.w}×${r.h}）`, 'success'); } };
     m.body.parentElement.querySelector('[data-act=pdf]').onclick = () => { if (imgGuard()) { const r = DataIO.exportPDF(scale()); if (r && r.ok) this.toast('PDF 文件已导出', 'success'); } };
+    m.body.parentElement.querySelector('[data-act=svg]').onclick = () => {
+      if (imgGuard()) {
+        const r = DataIO.exportDataSVG();
+        if (r && r.ok) this.toast(`SVG 矢量图已导出（${r.w}×${r.h}，可无限缩放）`, 'success');
+      }
+    };
     m.body.parentElement.querySelector('[data-act=json]').onclick = () => { if (imgGuard()) { DataIO.exportDataJSON(); this.toast('JSON 源数据已导出', 'success'); } };
     m.body.parentElement.querySelector('[data-act=csv]').onclick = () => { if (imgGuard()) { DataIO.exportDataCSV(); this.toast('CSV 源数据已导出（两张表）', 'success'); } };
     m.body.parentElement.querySelector('[data-act=xlsx]').onclick = () => { if (imgGuard()) { const r = DataIO.exportDataXLSX(); if (r && r.ok) this.toast('Excel 源数据已导出', 'success'); } };
@@ -1804,6 +1812,7 @@ const App = {
           <option value="tree" ${s.defaultLayout === 'tree' ? 'selected' : ''}>层级树状布局</option>
           <option value="grid" ${s.defaultLayout === 'grid' ? 'selected' : ''}>网格布局</option>
           <option value="grouped" ${s.defaultLayout === 'grouped' ? 'selected' : ''}>分簇布局</option>
+          <option value="community" ${s.defaultLayout === 'community' ? 'selected' : ''}>自动分簇（社区发现）</option>
           <option value="radial" ${s.defaultLayout === 'radial' ? 'selected' : ''}>放射状布局</option>
         </select></div>
 
@@ -1998,7 +2007,7 @@ const App = {
       sbFilter.textContent = names[GraphStore.focus.depth] || '溯源中';
     } else sbFilter.textContent = '筛选中';
     document.getElementById('sbZoom').textContent = Math.round(Renderer.view.scale * 100) + '%';
-    const layoutNames = { force: '力导向', circular: '环形', tree: '树状', grid: '网格', grouped: '分簇', radial: '放射状' };
+    const layoutNames = { force: '力导向', circular: '环形', tree: '树状', grid: '网格', grouped: '分簇', community: '自动分簇', radial: '放射状' };
     document.getElementById('sbLayout').textContent =
       GraphStore.isEmpty() ? '' : `布局：${layoutNames[ProjectStore.loadSettings().defaultLayout] || '力导向'}`;
   }

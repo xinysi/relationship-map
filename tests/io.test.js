@@ -74,6 +74,26 @@ test('JSON 导入：中英键兼容', async () => {
   assert.equal(parsed.relations[0].strength, 6);
 });
 
+test('SVG 矢量文档：结构完整 + XSS 转义', () => {
+  const { SampleData, Renderer } = load();
+  GraphStore.init();
+  for (const p of SampleData.persons) GraphStore.addPerson(p, { silent: true });
+  for (const r of SampleData.relations) GraphStore.addRelation(r, { silent: true });
+  GraphStore.reindex();
+  Renderer.theme = Renderer.THEMES.light;
+  Renderer.theme = Renderer.THEMES.light;
+  const doc = DataIO._svgDocument();
+  assert.ok(doc && doc.svg.startsWith('<?xml'));
+  assert.equal((doc.svg.match(/<circle/g) || []).length, GraphStore.persons.length, '每节点一个 circle');
+  assert.ok(doc.svg.includes('<path'), '关系边为 path');
+  assert.ok(doc.svg.includes('<text'), '含节点名文字');
+  // XSS 防护：特殊字符转义
+  GraphStore.persons[0].name = '甲<&>乙';
+  const doc2 = DataIO._svgDocument();
+  assert.ok(doc2.svg.includes('甲&lt;&amp;&gt;乙'), '特殊字符转义');
+  assert.ok(!doc2.svg.includes('<&>'), '无未转义注入');
+});
+
 test('CSV 未填强度保持 0（未设置）', async () => {
   const parsed = await DataIO.parseFiles([
     new File(['人物ID,人物姓名\nC1,甲\n'], 'p.csv', { type: 'text/csv' }),

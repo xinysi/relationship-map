@@ -13,6 +13,7 @@ const Layouts = {
     else if (name === 'tree') fn = this.tree;
     else if (name === 'grid') fn = this.grid;
     else if (name === 'grouped') fn = this.grouped;
+    else if (name === 'community') fn = this.community;
     else if (name === 'radial') fn = this.radial;
     else fn = this.force;
     await fn.call(this, persons, GraphStore.relations, onProgress || null);
@@ -436,11 +437,22 @@ onmessage = function (ev) { run(ev.data); };
 
   /* ---------- 分簇布局：按归属分组聚簇，簇心沿圆周分布（分组明显/人物多的图更易读） ---------- */
   async grouped(persons) {
+    return this._clusterPlace(persons, p => p.group || '未分组');
+  },
+
+  /* ---------- 自动分簇布局：Louvain 社区发现后按圈子聚簇（无需手填分组） ---------- */
+  async community(persons, relations) {
+    const groups = Community.detect(persons, relations);
+    return this._clusterPlace(persons, p => '社区' + (groups.get(p.id) ?? '0'));
+  },
+
+  /* 簇状排布共享实现：keyFn 决定聚类键，簇内圆盘栅格 + 簇心圆周扇区 */
+  async _clusterPlace(persons, keyFn) {
     const movable = persons.filter(p => !p.isLock);
     if (!movable.length) return;
     const groups = new Map();
     for (const p of movable) {
-      const g = p.group || '未分组';
+      const g = keyFn(p);
       if (!groups.has(g)) groups.set(g, []);
       groups.get(g).push(p);
     }

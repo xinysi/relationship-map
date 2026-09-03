@@ -6,6 +6,10 @@ __pycache__/
 # 本地生成物（PPT 演示产物、临时输出）
 output/
 
+# 私有剧情文档（含样本全文，不随公开仓库分发，仅本地保留）
+sl/
+js/grimtales-doc.js
+
 # 系统文件
 .DS_Store
 Thumbs.db

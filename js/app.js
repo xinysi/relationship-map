@@ -268,7 +268,6 @@ const App = {
 
     // 欢迎页
     document.getElementById('wImport').onclick = () => this.openImportModal();
-    document.getElementById('wDocSample').onclick = () => this.loadDocSample();
     document.getElementById('wSample').onclick = () => this.loadSample();
     document.getElementById('wAdd').onclick = () => this.openPersonModal();
     document.getElementById('wOpen').onclick = () => this.openProjectManager();
@@ -354,39 +353,6 @@ const App = {
     GraphStore.emitChange();
     await this.relayout('force', true);
     this.toast('示例数据加载完成，可自由拖拽、缩放、编辑体验', 'success');
-  },
-
-  /* ============================================================
-     内置剧情文档示例（Markdown 全量解析演示）
-     ============================================================ */
-  async loadDocSample() {
-    if (typeof GrimTalesDocs === 'undefined' || !GrimTalesDocs.length) {
-      this.toast('内置剧情文档示例不可用', 'warn');
-      return;
-    }
-    const progress = this.showProgressModal('正在解析剧情文档');
-    try {
-      let parsed = null;
-      const names = [];
-      progress.update(0.3, '解析剧情文档…');
-      await Utils.nextFrame();
-      const combined = GrimTalesDocs.map(d => d.text).join('\n\n');
-      parsed = DataIO.parseMarkdown(combined, GrimTalesDocs.map(d => d.name).join(' + '));
-      names.push(...GrimTalesDocs.map(d => d.name));
-      progress.update(0.9, '正在生成关系网…');
-      DataIO.applyImport(parsed, 'replace');
-      GraphStore.projectName = '残酷谎言 · 系列人物关系全景';
-      await Layouts.apply('force', (t) => progress.update(0.9 + t * 0.1, '力导向布局计算中…'));
-      Renderer.fitView();
-      progress.close();
-      const ev = (parsed.events || []).length;
-      this.toast(`剧情文档解析完成：${parsed.persons.length} 人物 / ${parsed.relations.length} 关系 / ${ev} 时间线事件`, 'success');
-      this.toast('可打开右侧「时间轴」面板查看年代线、大事记、因果序与登场速览', 'info');
-      this.renderTimeline();
-    } catch (e) {
-      progress.close();
-      this.toast(e.message || DataIO.MSG.BROKEN, 'error');
-    }
   },
 
   /* ============================================================

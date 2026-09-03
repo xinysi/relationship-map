@@ -8,6 +8,7 @@ const App = {
   boxSelectMode: false,
   connectMode: false,
   connectFirst: null,
+  pathModeFrom: null,
   _autosaveTimer: null,
   _saving: false,
 
@@ -490,6 +491,8 @@ const App = {
       }
 
       if (node) {
+        // 最短路径查询模式：点击目标人物
+        if (this.pathModeFrom) { this.finishPathQuery(node.id); e.preventDefault(); return; }
         if (e.ctrlKey || e.metaKey || e.shiftKey) {
           GraphStore.toggleSelect(node.id);
           // Ctrl 单选同样固定显示；多选不固定，避免干扰批量操作
@@ -716,6 +719,7 @@ const App = {
     const items = [];
     items.push({ label: '✏️ 编辑人物', action: () => this.openPersonModal(p) });
     items.push({ label: '🔗 从此添加关系', action: () => this.enterConnectMode(p.id) });
+    items.push({ label: '🔍 查找与某人的最短路径', action: () => this.enterPathMode(p.id) });
     items.push({ sep: true });
     items.push({ label2: '关联溯源' });
     items.push({ label: '展开一级关联', action: () => this.applyFocus(p.id, 1) });
@@ -742,9 +746,80 @@ const App = {
       { label: '👤 在此添加人物', action: () => this.openPersonModal(null, { x: w.x, y: w.y }) },
       { label: '🔗 添加关系', action: () => this.enterConnectMode() },
       { sep: true },
+      { label: '🥇 核心人物分析', action: () => this.openCentralModal() },
+      { sep: true },
       { label: '🖼 自适应画布', action: () => Renderer.fitView() },
       { label: '🎯 重置视图', action: () => Renderer.resetView() }
     ];
+  },
+
+  /* ---------- 最短路径查询模式 ---------- */
+  enterPathMode(fromId) {
+    this.pathModeFrom = fromId;
+    const p = GraphStore.getPerson(fromId);
+    const hint = document.getElementById('modeHint');
+    hint.classList.remove('hidden');
+    hint.textContent = `最短路径模式：已选【${p ? p.name : ''}】，请点击目标人物（ESC 取消）`;
+    document.getElementById('canvas').style.cursor = 'crosshair';
+  },
+  exitPathMode() {
+    this.pathModeFrom = null;
+    document.getElementById('modeHint').classList.add('hidden');
+    document.getElementById('canvas').style.cursor = 'default';
+  },
+  finishPathQuery(toId) {
+    const from = this.pathModeFrom;
+    const fromName = GraphStore.getPerson(from) ? GraphStore.getPerson(from).name : '';
+    this.exitPathMode();
+    const res = Analysis.shortestPath(GraphStore.persons, GraphStore.relations, from, toId);
+    if (!res) { this.toast(`【${fromName}】与目标人物之间没有可通达的关系路径`, 'warn'); return; }
+    if (!res.dist) { this.toast('目标与起点是同一人', 'info'); return; }
+    GraphStore.clearPinned();
+    GraphStore.clearFocus();
+    GraphStore.setSelection([]);
+    GraphStore.setHighlight(new Set(res.ids), `路径 ${fromName} → ${GraphStore.getPerson(toId) ? GraphStore.getPerson(toId).name : ''}`);
+    this.updateFocusBar();
+    const summary = res.ids.map((id, i) =>
+      (i === 0 ? '' : ` → [${res.edges[i - 1].relationType}] `) + (GraphStore.getPerson(id) ? GraphStore.getPerson(id).name : id)).join('');
+    this.toast(`最短路径 ${res.dist} 段：${summary}`, 'success');
+    const mid = GraphStore.getPerson(res.ids[Math.ceil(res.ids.length / 2) - 1]);
+    if (mid) Renderer.centerOn(mid.x, mid.y);
+  },
+
+  /* ---------- 核心人物分析（介数中心性榜单） ---------- */
+  openCentralModal() {
+    if (GraphStore.relations.length < 2) { this.toast('关系数据过少，无法分析', 'warn'); return; }
+    const list = Analysis.topCentral(GraphStore.persons, GraphStore.relations, 10);
+    const m = this.openModal({
+      title: '🥇 核心人物分析',
+      width: 520,
+      bodyHTML: `
+        <div class="form-hint">按「介数中心性」排序——值越高，说明更多人之间的往来必须经过 TA（桥梁人物）。点击人物可达定位。</div>
+        <div class="proj-list" style="margin-top:12px">
+          ${list.map((x, i) => {
+            const p = GraphStore.getPerson(x.id);
+            return `
+            <div class="proj-item" data-id="${Utils.escapeHtml(x.id)}" style="cursor:pointer">
+              <span style="width:30px;text-align:center;font-weight:700;color:${i < 3 ? 'var(--primary)' : 'var(--sub)'}">${i + 1}</span>
+              <div class="proj-info">
+                <div class="proj-name-t">${Utils.escapeHtml(p ? p.name : x.id)}${p && p.group ? ` <span class="dt-tag">${Utils.escapeHtml(p.group)}</span>` : ''}</div>
+                <div class="proj-meta">关系 ${x.deg} 条 · 介数 ${x.value.toFixed(1)} · 排名 ${x.rank}</div>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>`,
+      footerHTML: `<button class="btn" data-act="close">关闭</button>`
+    });
+    m.body.parentElement.querySelector('[data-act=close]').onclick = m.close;
+    m.body.querySelectorAll('.proj-item').forEach(el => {
+      el.onclick = () => {
+        const id = el.dataset.id;
+        GraphStore.setSelection([id]);
+        const p = GraphStore.getPerson(id);
+        if (p) Renderer.centerOn(p.x, p.y);
+        m.close();
+      };
+    });
   },
 
   /* ---------- 添加关系模式 ---------- */
@@ -1866,6 +1941,7 @@ const App = {
         hideCtxMenuSafe();
         // 全屏模式下 ESC 优先退出全屏
         if (document.body.classList.contains('canvas-fullscreen')) { this.toggleFullscreen(); return; }
+        if (this.pathModeFrom) { this.exitPathMode(); return; }
         if (this.connectMode) { this.exitConnectMode(); return; }
         if (document.activeElement === document.getElementById('searchInput')) return; // 由输入框自行处理
         if (GraphStore.pinnedId) { GraphStore.clearPinned(); return; }

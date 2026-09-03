@@ -17,7 +17,9 @@ const FILES = [
   'layout.js',
   'renderer.js',
   'io.js',
-  'share.js'
+  'storage.js',
+  'share.js',
+  'llm.js'
 ];
 
 const sandbox = {
@@ -47,7 +49,7 @@ function load() {
     .join('\n;\n');
   const wrapper =
     `(function () {\n${code}\n;\n` +
-    `return { Utils, GraphStore, Layouts, Renderer, DataIO, SampleData, Community, Analysis, SharePage };\n})()`;
+    `return { Utils, GraphStore, Layouts, Renderer, DataIO, SampleData, Community, Analysis, ProjectStore, SharePage, LlmExtract };\n})()`;
   const mod = vm.runInNewContext(wrapper, sandbox, { filename: 'bundle.js', timeout: 30000 });
   cached = mod;
   return mod;

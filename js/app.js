@@ -309,6 +309,7 @@ const App = {
       case 'saveProject': this.saveCurrentProject(false); break;
       case 'projectList': this.openProjectManager(); break;
       case 'import': this.openImportModal(); break;
+      case 'llmExtract': this.openLlmModal(); break;
       case 'template': this.openTemplateModal(); break;
       case 'export': this.openExportModal(); break;
       case 'addPerson': this.openPersonModal(); break;
@@ -1347,6 +1348,72 @@ const App = {
   },
 
   /* ============================================================
+     AI 智能提取（LLM）
+     ============================================================ */
+  openLlmModal() {
+    const cfg = LlmExtract.settings();
+    const m = this.openModal({
+      title: '🤖 AI 智能提取 · 文本 → 人物关系网',
+      width: 640,
+      bodyHTML: `
+        ${cfg.llmKey ? '' : `<div class="form-hint" style="color:var(--err);margin-bottom:8px">⚠ 尚未配置 AI 服务（系统设置 → AI 服务）。<a href="javascript:void(0)" id="llmGoCfg" style="color:var(--primary)">前往设置</a></div>`}
+        <div class="form-item"><label>粘贴任意小说 / 剧本文本（约 1.5 万字内）</label>
+          <textarea id="llmText" rows="10" placeholder="粘贴正文，AI 将自动抽取人物、关系与事件…" style="width:100%;resize:vertical"></textarea></div>
+        <div class="form-hint" style="margin-bottom:10px">⚠ 隐私提示：文本将发送至你配置的第三方 AI 服务（当前：${Utils.escapeHtml(cfg.llmModel)}）用于提取，发送前请确认内容可接受。</div>
+        <div id="llmProgress" class="hidden">
+          <div class="progress-wrap"><div class="progress-bar"><div class="progress-inner"></div></div><div class="progress-text">准备中…</div></div>
+        </div>
+        <div id="llmResult"></div>`,
+      footerHTML: `<button class="btn" data-act="cancel">关闭</button><button class="btn primary" data-act="run">🤖 开始提取</button>`
+    });
+    m.body.parentElement.querySelector('[data-act=cancel]').onclick = m.close;
+    const goCfg = m.body.querySelector('#llmGoCfg');
+    if (goCfg) goCfg.onclick = () => { m.close(); this.openSettings(); };
+    m.body.parentElement.querySelector('[data-act=run]').onclick = async () => {
+      const text = m.body.querySelector('#llmText').value;
+      const bar = m.body.querySelector('#llmProgress');
+      const inner = bar.querySelector('.progress-inner');
+      const tlabel = bar.querySelector('.progress-text');
+      const result = m.body.querySelector('#llmResult');
+      bar.classList.remove('hidden');
+      result.innerHTML = '';
+      try {
+        const res = await LlmExtract.extract(text, (t, msg) => {
+          inner.style.width = Math.round(t * 100) + '%';
+          if (msg) tlabel.textContent = msg;
+        });
+        // 校验引用完整性
+        const ids = new Set(res.persons.map(p => p.id));
+        const orphan = res.relations.filter(r => !ids.has(r.sourceId) || !ids.has(r.targetId)).length;
+        result.innerHTML = `
+          <div class="dt-section-title">提取结果（待应用）</div>
+          <div class="result-summary">
+            <div class="rs-card ok"><div class="num">${res.persons.length}</div><div class="lbl">人物</div></div>
+            <div class="rs-card ok"><div class="num">${res.relations.length}</div><div class="lbl">关系</div></div>
+            <div class="rs-card ok"><div class="num">${res.events.length}</div><div class="lbl">事件</div></div>
+            <div class="rs-card ${orphan ? 'bad' : 'ok'}"><div class="num">${orphan}</div><div class="lbl">无效关系引用</div></div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+            <select id="llmMode" style="flex:none">
+              <option value="replace">替换当前画布</option>
+              <option value="append">追加到当前画布</option>
+            </select>
+            <button class="btn primary" data-act="apply">应用提取结果</button>
+          </div>`;
+        result.querySelector('[data-act=apply]').onclick = () => {
+          const mode = result.querySelector('#llmMode').value;
+          const applied = DataIO.applyImport({ persons: res.persons, relations: res.relations, events: res.events, errors: [], fileName: 'AI 提取' }, mode);
+          this.toast(`已应用：人物 ${applied.persons} · 关系 ${applied.relations}${applied.events ? ' · 事件 ' + applied.events : ''}${orphan ? `（${orphan} 条无效引用跳过）` : ''}`, 'success');
+          m.close();
+        };
+      } catch (e) {
+        bar.classList.add('hidden');
+        result.innerHTML = `<div class="form-hint" style="color:var(--err)">提取失败：${Utils.escapeHtml(e.message || String(e))}</div>`;
+      }
+    };
+  },
+
+  /* ============================================================
      导入
      ============================================================ */
   openImportModal() {
@@ -1909,6 +1976,19 @@ const App = {
             `<div class="error-item"><span style="flex:none;color:var(--sub)">${Utils.formatTime(l.t)}</span><span class="e-msg">${Utils.escapeHtml(l.text)}</span></div>`).join('')
           : '<div class="error-item"><span class="e-msg">暂无操作记录</span></div>'}
         </div>
+        <div class="dt-section-title">AI 服务（智能提取功能，可选配置）</div>
+        <div class="form-hint" style="margin-bottom:8px">OpenAI 兼容接口；密钥仅保存在本机浏览器。⚠ 使用智能提取会把文本发送至该服务。</div>
+        <div class="form-row">
+          <div class="form-item" style="flex:2"><label>服务地址 Base URL</label>
+            <input type="text" id="set-llmBase" value="${Utils.escapeHtml(s.llmBase || '')}" placeholder="https://api.deepseek.com/v1"></div>
+          <div class="form-item"><label>模型名</label>
+            <input type="text" id="set-llmModel" value="${Utils.escapeHtml(s.llmModel || '')}" placeholder="deepseek-chat"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-item" style="flex:2"><label>API 密钥</label>
+            <input type="password" id="set-llmKey" value="${Utils.escapeHtml(s.llmKey || '')}" placeholder="sk-…"></div>
+          <div class="form-item" style="align-self:flex-end"><button class="btn sm" id="btnTestLlm">测试连接</button></div>
+        </div>
         <div class="form-hint" style="margin-top:8px">所有数据 100% 本地离线存储，不上传云端；工程文件支持自定义密码加密</div>`,
       footerHTML: `<button class="btn" data-act="close">关闭</button><button class="btn primary" data-act="ok">保存设置</button>`
     });
@@ -1916,11 +1996,38 @@ const App = {
     m.body.querySelector('#set-interval').addEventListener('input', (e) => {
       m.body.querySelector('#set-intervalV').textContent = e.target.value + 's';
     });
+    m.body.querySelector('#btnTestLlm').onclick = async () => {
+      const base = m.body.querySelector('#set-llmBase').value.trim().replace(/\/+$/, '');
+      const model = m.body.querySelector('#set-llmModel').value.trim();
+      const key = m.body.querySelector('#set-llmKey').value.trim();
+      if (!base || !model || !key) { this.toast('请先填写服务地址、模型与密钥', 'warn'); return; }
+      const btn = m.body.querySelector('#btnTestLlm');
+      btn.disabled = true; btn.textContent = '测试中…';
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 30000);
+        const resp = await fetch(base + '/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+          body: JSON.stringify({ model, temperature: 0, max_tokens: 8, messages: [{ role: 'user', content: 'ping' }] }),
+          signal: controller.signal
+        });
+        clearTimeout(timer);
+        if (resp.ok) this.toast('连接成功 ✓（模型可用）', 'success');
+        else this.toast(`连接失败：HTTP ${resp.status}，请检查地址/密钥/模型名`, 'error');
+      } catch (e) {
+        this.toast('连接失败：' + (e.message || '网络错误') + '（部分服务不允许浏览器直连，需 CORS 支持）', 'error');
+      }
+      btn.disabled = false; btn.textContent = '测试连接';
+    };
     m.body.parentElement.querySelector('[data-act=ok]').onclick = () => {
       ProjectStore.saveSettings({
         autosave: m.body.querySelector('#set-autosave').checked,
         autosaveInterval: Number(m.body.querySelector('#set-interval').value),
-        defaultLayout: m.body.querySelector('#set-layout').value
+        defaultLayout: m.body.querySelector('#set-layout').value,
+        llmBase: m.body.querySelector('#set-llmBase').value.trim(),
+        llmModel: m.body.querySelector('#set-llmModel').value.trim(),
+        llmKey: m.body.querySelector('#set-llmKey').value.trim()
       });
       this.applyAutosave();
       m.close();

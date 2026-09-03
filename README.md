@@ -162,4 +162,4 @@ rwgxw/
 
 ## 📄 许可
 
-本项目目前未指定开源许可证。公开仓库仅供浏览与学习；如需允许他人使用、修改与再分发（或选择具体开源协议，如 MIT / Apache-2.0），请先确定许可证类型并添加 LICENSE 文件。
+[MIT](LICENSE)（Copyright © 2026 xinysi）。内置的 `js/vendor/xlsx.full.min.js`（SheetJS 社区版）遵循其自身的 Apache-2.0 许可，详见 LICENSE 中的第三方声明。

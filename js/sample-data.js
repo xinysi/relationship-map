@@ -1,0 +1,51 @@
+'use strict';
+/* ================= 内置示例数据（三国人物关系） ================= */
+const SampleData = {
+  name: '示例工程 · 三国人物关系',
+  persons: [
+    { id: 'P001', name: '刘备', group: '蜀汉', gender: '男', age: '', position: '昭烈皇帝', tag: ['主公', '仁德'], intro: '蜀汉开国皇帝，汉室宗亲，以仁德闻名天下。' },
+    { id: 'P002', name: '关羽', group: '蜀汉', gender: '男', age: '', position: '前将军', tag: ['武圣', '五虎上将'], intro: '刘备义弟，忠义无双，威震华夏。' },
+    { id: 'P003', name: '张飞', group: '蜀汉', gender: '男', age: '', position: '车骑将军', tag: ['五虎上将'], intro: '刘备义弟，勇猛粗豪，长坂桥一声退曹军。' },
+    { id: 'P004', name: '诸葛亮', group: '蜀汉', gender: '男', age: '', position: '丞相', tag: ['军师', '卧龙'], intro: '号卧龙，蜀汉丞相，鞠躬尽瘁死而后已。' },
+    { id: 'P005', name: '赵云', group: '蜀汉', gender: '男', age: '', position: '镇军将军', tag: ['五虎上将'], intro: '常山赵子龙，长坂坡七进七出救阿斗。' },
+    { id: 'P006', name: '刘禅', group: '蜀汉', gender: '男', age: '', position: '后主', tag: ['君主'], intro: '刘备之子，蜀汉第二位皇帝。' },
+    { id: 'P007', name: '曹操', group: '曹魏', gender: '男', age: '', position: '魏武帝', tag: ['枭雄'], intro: '曹魏奠基人，挟天子以令诸侯。' },
+    { id: 'P008', name: '曹丕', group: '曹魏', gender: '男', age: '', position: '魏文帝', tag: ['君主'], intro: '曹操之子，代汉称帝建立曹魏。' },
+    { id: 'P009', name: '司马懿', group: '曹魏', gender: '男', age: '', position: '太傅', tag: ['谋士'], intro: '曹魏权臣，善隐忍，西拒诸葛，后奠定晋朝基业。' },
+    { id: 'P010', name: '典韦', group: '曹魏', gender: '男', age: '', position: '校尉', tag: ['护卫'], intro: '曹操帐下猛将，宛城之战力战殉主。' },
+    { id: 'P011', name: '孙权', group: '东吴', gender: '男', age: '', position: '吴大帝', tag: ['君主'], intro: '东吴之主，据江东而观天下。' },
+    { id: 'P012', name: '周瑜', group: '东吴', gender: '男', age: '', position: '大都督', tag: ['儒将'], intro: '美周郎，赤壁之战大破曹军。' },
+    { id: 'P013', name: '孙尚香', group: '东吴', gender: '女', age: '', position: '郡主', tag: ['弓腰姬'], intro: '孙权之妹，后嫁于刘备。' },
+    { id: 'P014', name: '吕蒙', group: '东吴', gender: '男', age: '', position: '都督', tag: ['将领'], intro: '白衣渡江，袭取荆州。' },
+    { id: 'P015', name: '貂蝉', group: '其他', gender: '女', age: '', position: '歌伎', tag: ['四大美女'], intro: '连环计核心人物，离间董卓与吕布。' },
+    { id: 'P016', name: '吕布', group: '其他', gender: '男', age: '', position: '温侯', tag: ['飞将'], intro: '人中吕布，马中赤兔，三姓家奴，勇冠三军。' },
+    { id: 'P017', name: '董卓', group: '其他', gender: '男', age: '', position: '太师', tag: ['权臣'], intro: '专权乱政，祸乱朝纲，终被吕布所杀。' },
+    { id: 'P018', name: '孙策', group: '东吴', gender: '男', age: '', position: '小霸王', tag: ['奠基者'], intro: '孙权之兄，平定江东基业。' }
+  ],
+  relations: [
+    { sourceId: 'P001', targetId: 'P002', relationType: '结义兄弟', strength: 10, time: '184年', desc: '桃园三结义，不求同年同月同日生，但求同年同月同日死。' },
+    { sourceId: 'P001', targetId: 'P003', relationType: '结义兄弟', strength: 10, time: '184年', desc: '桃园三结义。' },
+    { sourceId: 'P002', targetId: 'P003', relationType: '结义兄弟', strength: 9, time: '184年' },
+    { sourceId: 'P001', targetId: 'P004', relationType: '君臣', strength: 10, time: '207年', desc: '三顾茅庐请出诸葛亮。' },
+    { sourceId: 'P001', targetId: 'P005', relationType: '君臣', strength: 9, desc: '备受信任的宿将。' },
+    { sourceId: 'P001', targetId: 'P006', relationType: '父子', strength: 10 },
+    { sourceId: 'P001', targetId: 'P013', relationType: '夫妻', strength: 7, time: '209年', desc: '政治联姻，孙刘联盟的纽带。' },
+    { sourceId: 'P004', targetId: 'P006', relationType: '辅佐', strength: 10, desc: '受刘备托孤，辅佐后主。' },
+    { sourceId: 'P004', targetId: 'P009', relationType: '宿敌', strength: 9, desc: '六出祁山与司马懿斗智斗力。' },
+    { sourceId: 'P007', targetId: 'P008', relationType: '父子', strength: 10 },
+    { sourceId: 'P007', targetId: 'P010', relationType: '主仆', strength: 9, desc: '典韦拼死护卫曹操。' },
+    { sourceId: 'P007', targetId: 'P009', relationType: '君臣', strength: 8, desc: '司马懿辅佐曹魏四代。' },
+    { sourceId: 'P008', targetId: 'P009', relationType: '托孤', strength: 8, desc: '曹丕临终托孤于司马懿。' },
+    { sourceId: 'P011', targetId: 'P012', relationType: '君臣', strength: 10, desc: '言听计从，赤壁拜帅。' },
+    { sourceId: 'P011', targetId: 'P013', relationType: '兄妹', strength: 9 },
+    { sourceId: 'P011', targetId: 'P018', relationType: '兄弟', strength: 9 },
+    { sourceId: 'P011', targetId: 'P014', relationType: '君臣', strength: 8 },
+    { sourceId: 'P012', targetId: 'P001', relationType: '对手', strength: 7, desc: '赤壁之战火攻破曹。' },
+    { sourceId: 'P014', targetId: 'P002', relationType: '敌对', strength: 8, desc: '白衣渡江，关羽败走麦城。' },
+    { sourceId: 'P016', targetId: 'P017', relationType: '义父子', strength: 8, desc: '吕布认董卓为义父，后反目。' },
+    { sourceId: 'P015', targetId: 'P017', relationType: '离间', strength: 7, desc: '连环计离间董卓吕布。' },
+    { sourceId: 'P015', targetId: 'P016', relationType: '情感', strength: 6 },
+    { sourceId: 'P007', targetId: 'P001', relationType: '对手', strength: 9, desc: '青梅煮酒论英雄，天下双雄。' },
+    { sourceId: 'P018', targetId: 'P012', relationType: '挚友', strength: 8, desc: '升堂拜母，总角之好。' }
+  ]
+};

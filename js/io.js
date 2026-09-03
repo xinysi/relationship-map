@@ -1,0 +1,1791 @@
+﻿'use strict';
+/* ================= 数据导入 / 导出模块 =================
+   PRD 3.1 一键导入 / 3.6 数据导出与备份 / 11 异常文案规范
+------------------------------------------------ */
+const DataIO = {
+
+  /* ---------- PRD 11 章统一异常文案 ---------- */
+  MSG: {
+    BAD_FORMAT: '当前文件格式不支持，请上传Excel/CSV/JSON/Markdown格式文件',
+    MISS_FIELD: '表格缺少【人物ID/人物姓名/关系类型】必填字段，请核对模板后重试',
+    DUP_ID: (id) => `检测到重复人物ID：${id}，请修改唯一标识后重新导入`,
+    TOO_LARGE: '文件数据量过大，将分批解析，请耐心等待',
+    FILE_TOO_BIG: '单个文件超过 100MB，请拆分后再导入',
+    BROKEN: '文件解析失败，文件损坏或内容为空，请更换文件重试',
+    NO_SELECT: '请选择需要删除的节点/关系',
+    EMPTY_EXPORT: '当前画布无内容，无法执行导出操作',
+    DEL_PERSON: '删除该人物将同步清空所有关联关系，是否确认删除？',
+    PROJECT_BROKEN: '工程文件损坏或版本不兼容，无法打开',
+    SAVE_FAIL: '文件保存失败，请检查磁盘权限与存储空间'
+  },
+
+  /* ---------- 表头字段映射（中英文兼容） ---------- */
+  PERSON_HEADERS: {
+    id: ['人物id', '人物ID'.toLowerCase(), 'id', '编号', '唯一标识'],
+    name: ['人物姓名', '姓名', 'name', '名称', '人物名称'],
+    alias: ['英文名/别名', '英文名', '别名', 'alias', '英文别名', '称号'],
+    avatar: ['头像', '头像url', '头像url/本地路径', 'avatar', '图片', '照片', '头像url/本地路径'.toLowerCase()],
+    intro: ['人物简介', '简介', 'intro', '描述', '说明'],
+    tag: ['人物标签', '标签', 'tag', 'tags'],
+    group: ['归属分组', '分组', 'group', '阵营', '组织'],
+    gender: ['性别', 'gender'],
+    age: ['年龄', 'age'],
+    position: ['身份职位', '身份', '职位', 'position', '职业', '身份/职位']
+  },
+  EVENT_HEADERS: {
+    title: ['事件名称', '标题', '事件', 'event', '事件名'],
+    time: ['时间/年代', '时间', '年代', 'time', '发生时间'],
+    order: ['排序序号', '排序', '序号', '顺位', 'order'],
+    era: ['时期/篇章', '时期', '篇章', '年代线', 'era', '分组'],
+    desc: ['事件说明', '说明', 'desc', '描述', '详情'],
+    persons: ['关联人物', '人物', 'persons', '涉及人物']
+  },
+  RELATION_HEADERS: {
+    sourceId: ['起始人物id', '起始id', 'sourceid', 'source', 'from', '起点', '源人物id'],
+    targetId: ['目标人物id', '目标id', 'targetid', 'target', 'to', '终点', '目标人物ID'.toLowerCase()],
+    relationType: ['关系类型', 'relationtype', '关系', '类型'],
+    desc: ['关系描述', '描述', 'desc', '说明'],
+    strength: ['关系强度', '强度', 'strength'],
+    time: ['关系时间', '时间', 'time'],
+    note: ['备注', 'note', '备注说明']
+  },
+
+  _normHeader(h) {
+    return String(h || '').trim().toLowerCase().replace(/\s+/g, '');
+  },
+  _matchField(header, map) {
+    const h = this._normHeader(header);
+    for (const field in map) if (map[field].map(this._normHeader).includes(h)) return field;
+    return null;
+  },
+  /* 判断一张表是人物表还是关系表 */
+  classifySheet(headers) {
+    let personScore = 0, relationScore = 0, eventScore = 0;
+    for (const h of headers) {
+      if (this._matchField(h, this.PERSON_HEADERS)) personScore++;
+      if (this._matchField(h, this.RELATION_HEADERS)) relationScore++;
+      if (this._matchField(h, this.EVENT_HEADERS)) eventScore++;
+    }
+    if (eventScore >= 2 && eventScore > relationScore && eventScore > personScore) return 'event';
+    if (personScore >= 1 && relationScore >= 2) return relationScore > personScore ? 'relation' : 'person';
+    if (relationScore >= 2) return 'relation';
+    if (personScore >= 1) return 'person';
+    return null;
+  },
+
+  /* ============================================================
+     CSV 解析（支持引号转义、逗号/分号/Tab 分隔、GBK 编码回退）
+     ============================================================ */
+  _detectDelim(line) {
+    const counts = { ',': 0, ';': 0, '\t': 0 };
+    let inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') inQ = !inQ;
+      else if (!inQ && c in counts) counts[c]++;
+    }
+    let best = ',', bestN = 0;
+    for (const d in counts) if (counts[d] > bestN) { bestN = counts[d]; best = d; }
+    return best;
+  },
+  parseCSVText(text) {
+    text = text.replace(/^\uFEFF/, '');
+    if (!text.trim()) return [];
+    const delim = this._detectDelim(text.split(/\r?\n/)[0] || '');
+    const rows = [];
+    let row = [], field = '', inQ = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (inQ) {
+        if (c === '"') {
+          if (text[i + 1] === '"') { field += '"'; i++; }
+          else inQ = false;
+        } else field += c;
+      } else if (c === '"') inQ = true;
+      else if (c === delim) { row.push(field); field = ''; }
+      else if (c === '\n') { row.push(field); field = ''; rows.push(row); row = []; }
+      else if (c === '\r') { /* skip */ }
+      else field += c;
+    }
+    if (field !== '' || row.length) { row.push(field); rows.push(row); }
+    return rows.filter(r => r.some(c => String(c).trim() !== ''));
+  },
+
+  async _readFileText(file) {
+    const buf = await file.arrayBuffer();
+    let text = new TextDecoder('utf-8').decode(buf);
+    if (text.includes('\uFFFD')) {
+      try { text = new TextDecoder('gbk').decode(buf); } catch (e) { /* 保留 utf-8 */ }
+    }
+    return text;
+  },
+
+  /* ============================================================
+     导入主流程
+     files: FileList / File[]；opts: {mode}
+     返回 {persons, relations, errors, fileName}
+     ============================================================ */
+  async parseFiles(files, opts, onProgress) {
+    opts = opts || {};
+    onProgress = onProgress || (() => {});
+    const fileArr = Array.from(files || []);
+    if (!fileArr.length) throw new Error(this.MSG.BAD_FORMAT);
+
+    const allPersons = [], allRelations = [], allEvents = [], errors = [];
+    const seenImportIds = new Set(); // 已见人物 ID，O(1) 判重替代数组 find
+    const mdQueue = [];
+    let totalRows = 0;
+
+    for (let fi = 0; fi < fileArr.length; fi++) {
+      const file = fileArr[fi];
+      const base = (onProgress.length ? (fi / fileArr.length) : 0);
+      const span = 1 / fileArr.length;
+      const p2 = (t) => onProgress(base + t * span);
+      p2(0.05);
+
+      const ext = (file.name.split('.').pop() || '').toLowerCase();
+      if (file.size > 100 * 1024 * 1024) throw new Error(this.MSG.FILE_TOO_BIG);
+      let sheets = []; // [{name, rows:[[...]]}]
+
+      try {
+        if (ext === 'xlsx' || ext === 'xls') {
+          const buf = await file.arrayBuffer();
+          const wb = XLSX.read(new Uint8Array(buf), { type: 'array' });
+          for (const sn of wb.SheetNames) {
+            const ws = wb.Sheets[sn];
+            const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' });
+            sheets.push({ name: sn, rows });
+          }
+        } else if (ext === 'csv' || ext === 'txt') {
+          const text = await this._readFileText(file);
+          sheets.push({ name: file.name, rows: this.parseCSVText(text) });
+        } else if (ext === 'json') {
+          const text = await this._readFileText(file);
+          p2(0.4);
+          let obj = null;
+          try { obj = JSON.parse(text); } catch (e) { throw new Error(this.MSG.BROKEN); }
+          const parsed = this._parseJSONData(obj, file.name);
+          allPersons.push(...parsed.persons);
+          allRelations.push(...parsed.relations);
+          allEvents.push(...(parsed.events || []));
+          errors.push(...parsed.errors);
+          totalRows += parsed.persons.length + parsed.relations.length;
+          p2(1);
+          continue;
+        } else if (ext === 'md' || ext === 'markdown') {
+          // 剧情文档（Markdown）：先收集，最后多文档合并为一次解析（跨文档人物/ID 合并）
+          const text = await this._readFileText(file);
+          mdQueue.push({ name: file.name, text });
+          p2(1);
+          continue;
+        } else {
+          throw new Error(this.MSG.BAD_FORMAT);
+        }
+      } catch (e) {
+        if (e && (e.message === this.MSG.BAD_FORMAT || e.message === this.MSG.BROKEN || e.message === this.MSG.FILE_TOO_BIG)) throw e;
+        throw new Error(this.MSG.BROKEN);
+      }
+
+      if (!sheets.length || !sheets.some(s => s.rows.length)) {
+        // 尝试继续，若最终无数据则报损坏
+        continue;
+      }
+
+      p2(0.3);
+      // 解析每张 sheet
+      let parsedAny = false;
+      for (const sheet of sheets) {
+        if (!sheet.rows.length) continue;
+        const headerRow = sheet.rows.find(r => r.some(c => String(c).trim() !== ''));
+        if (!headerRow) continue;
+        const kind = this.classifySheet(headerRow) ||
+          (/人物|person/i.test(sheet.name) ? 'person' : /关系|relation/i.test(sheet.name) ? 'relation' : null);
+        if (!kind) continue;
+        parsedAny = true;
+        const headerIdx = sheet.rows.indexOf(headerRow);
+        const colMap = {};
+        headerRow.forEach((h, i) => {
+          const f = kind === 'person' ? this._matchField(h, this.PERSON_HEADERS) : this._matchField(h, this.RELATION_HEADERS);
+          if (f && !(f in colMap)) colMap[f] = i;
+        });
+
+        const dataRows = sheet.rows.slice(headerIdx + 1);
+        totalRows += dataRows.length;
+        if (dataRows.length > 5000) Utils.emitter.emit('toast', { type: 'warn', text: this.MSG.TOO_LARGE });
+
+        await Utils.chunked(dataRows, (row, ri) => {
+          const lineNo = headerIdx + ri + 2; // 1-based 含表头
+          const get = (f) => (colMap[f] != null ? String(row[colMap[f]] == null ? '' : row[colMap[f]]).trim() : '');
+          if (kind === 'person') {
+            const id = get('id'), name = get('name');
+            if (!id) { errors.push({ row: lineNo, table: '人物信息表', level: 'error', msg: '缺少必填字段【人物ID】' }); return; }
+            if (!name) { errors.push({ row: lineNo, table: '人物信息表', level: 'error', msg: `人物【${id}】缺少必填字段【人物姓名】` }); return; }
+            if (seenImportIds.has(id)) { errors.push({ row: lineNo, table: '人物信息表', level: 'error', msg: this.MSG.DUP_ID(id) }); return; }
+            seenImportIds.add(id);
+            allPersons.push(this._objToPerson({
+              id, name, alias: get('alias'), avatar: get('avatar'), intro: get('intro'), tag: get('tag'),
+              group: get('group'), gender: get('gender'), age: get('age'), position: get('position')
+            }));
+          } else if (kind === 'event') {
+            const title = get('title');
+            if (!title) { errors.push({ row: lineNo, table: '时间线事件表', level: 'error', msg: '缺少必填字段【事件名称】' }); return; }
+            allEvents.push(this._objToEvent({
+              title, time: get('time'), order: get('order'), era: get('era'), desc: get('desc'), persons: get('persons')
+            }));
+          } else {
+            const sourceId = get('sourceId'), targetId = get('targetId'), type = get('relationType');
+            if (!sourceId || !targetId || !type) {
+              errors.push({ row: lineNo, table: '关系信息表', level: 'error', msg: '缺少必填字段【起始人物ID/目标人物ID/关系类型】' });
+              return;
+            }
+            const strengthRaw = get('strength');
+            let strength = 0;
+            if (strengthRaw !== '') {
+              const num = Number(strengthRaw);
+              if (isNaN(num)) { errors.push({ row: lineNo, table: '关系信息表', level: 'warn', msg: `关系【${type}】强度"${strengthRaw}"非数字，已忽略强度` }); }
+              else strength = Utils.clamp(Math.round(num), 1, 10);
+            }
+            allRelations.push(this._objToRelation({
+              sourceId, targetId, relationType: type, desc: get('desc'),
+              strength, time: get('time'), note: get('note')
+            }));
+          }
+        }, (t) => p2(0.3 + t * 0.65), 1000);
+      }
+      p2(1);
+      if (!parsedAny && sheets.some(s => s.rows.length > 0)) {
+        errors.push({ row: 1, table: file.name, level: 'error', msg: this.MSG.MISS_FIELD });
+      }
+    }
+
+    /* ---------- Markdown 剧情文档（多文档合并解析，跨文档人物自动合并） ---------- */
+    if (mdQueue.length) {
+      onProgress(0.2);
+      // 总览/一览类文档优先解析：先建立全系列人物表，后续各篇的亲属/恩怨指代匹配更完整，
+      // 避免解析结果随文件选择顺序漂移（其余文档保持用户选择顺序，使用稳定排序）
+      const OVERVIEW_RE = /总览|一览|速览|汇总|概述|概览|综合|族谱|家谱/;
+      const overviewRank = (d) =>
+        (OVERVIEW_RE.test(d.name) ? 4 : 0) +
+        (OVERVIEW_RE.test(String(d.text || '').slice(0, 300)) ? 2 : 0);
+      mdQueue.sort((a, b) => overviewRank(b) - overviewRank(a));
+      const combined = mdQueue.map(d => d.text).join('\n\n');
+      const parsed = this.parseMarkdown(combined, mdQueue.map(d => d.name).join(' + '));
+      allPersons.push(...parsed.persons);
+      allRelations.push(...parsed.relations);
+      allEvents.push(...parsed.events);
+      // 解析统计/提示信息与真实错误分离：level=info 不参与"异常/跳过"计数展示
+      errors.push(...parsed.errors, ...(parsed.infos || []).map(m => ({ row: '-', table: '剧情文档', level: 'info', msg: m })));
+      totalRows += parsed.persons.length + parsed.relations.length + parsed.events.length;
+      onProgress(0.9);
+      await Utils.nextFrame();
+    }
+
+    if (totalRows === 0 && !allPersons.length && !allRelations.length && !allEvents.length) {
+      const realErr = errors.find(e => e.level !== 'info');
+      throw new Error(realErr ? realErr.msg : this.MSG.BROKEN);
+    }
+
+    /* ---------- 全局校验 ---------- */
+    onProgress(0.95);
+    await Utils.nextFrame();
+    // 追加模式下与现有画布比对重复 ID
+    const existing = new Set(opts.mode === 'append' ? GraphStore.persons.map(p => p.id) : []);
+    const finalPersons = [], seen = new Set();
+    for (const p of allPersons) {
+      if (seen.has(p.id)) continue;
+      if (existing.has(p.id)) {
+        errors.push({ row: '-', table: '人物信息表', level: 'error', msg: this.MSG.DUP_ID(p.id) + '（与当前画布重复，已跳过）' });
+        continue;
+      }
+      seen.add(p.id); finalPersons.push(p);
+    }
+    // 追加模式：同名/同段名/同别名人物与现有画布合并，避免跨文档重复节点
+    const idMap = new Map();
+    if (opts.mode === 'append') {
+      for (let i = finalPersons.length - 1; i >= 0; i--) {
+        const p = finalPersons[i];
+        let hit = null;
+        const key = p.name.toLowerCase();
+        for (const ep of GraphStore.persons) {
+          if (ep.name.toLowerCase() === key || ((ep.alias || '').toLowerCase() === key && key)) { hit = ep; break; }
+        }
+        if (!hit) {
+          const seg = p.name.split('·')[0];
+          for (const ep of GraphStore.persons) {
+            if (!/[（(]/.test(ep.name) && ep.name.split('·')[0] === seg) { hit = ep; break; }
+          }
+        }
+        if (hit) {
+          idMap.set(p.id, hit.id);
+          // 名字升级：短名（安娜）→ 全名（安娜·格雷）
+          if (p.name.includes(hit.name) && p.name.length > hit.name.length) hit.name = p.name;
+          if (!hit.alias && p.alias) hit.alias = p.alias;
+          if ((!hit.intro || hit.intro.length < p.intro.length) && p.intro) hit.intro = p.intro;
+          if (!hit.group && p.group) hit.group = p.group;
+          if (!hit.avatar && p.avatar) hit.avatar = p.avatar;
+          finalPersons.splice(i, 1);
+        }
+      }
+      for (const r of allRelations) {
+        if (idMap.has(r.sourceId)) r.sourceId = idMap.get(r.sourceId);
+        if (idMap.has(r.targetId)) r.targetId = idMap.get(r.targetId);
+      }
+      for (const ev of allEvents) {
+        ev.persons = (ev.persons || []).map(n => idMap.has(n) ? idMap.get(n) : n);
+      }
+    }
+    const knownIds = new Set([...finalPersons.map(p => p.id), ...(opts.mode === 'append' ? GraphStore.persons.map(p => p.id) : [])]);
+    let finalRelations = [];
+    for (const r of allRelations) {
+      if (!knownIds.has(r.sourceId) || !knownIds.has(r.targetId)) {
+        errors.push({
+          row: '-', table: '关系信息表', level: 'error',
+          msg: `关系【${r.relationType}】关联的人物ID不存在（${!knownIds.has(r.sourceId) ? r.sourceId : r.targetId}），已跳过`
+        });
+        continue;
+      }
+      finalRelations.push(r);
+    }
+    // 追加模式：与现有画布中同对人物的同类关系去重，避免重复连线
+    if (opts.mode === 'append') {
+      const normType = (t) => /^(亲子|父子|父女|母子|母女|养子|养女)$/.test(t) ? '亲子' : (t === '配偶' ? '夫妻' : t);
+      const existingKeys = new Set(GraphStore.relations.map(r => [r.sourceId, r.targetId].sort().join('|') + '|' + normType(r.relationType)));
+      const batchKeys = new Set();
+      finalRelations = finalRelations.filter(r => {
+        const key = [r.sourceId, r.targetId].sort().join('|') + '|' + normType(r.relationType);
+        if (existingKeys.has(key) || batchKeys.has(key)) return false;
+        batchKeys.add(key);
+        return true;
+      });
+    }
+
+    onProgress(1);
+    return {
+      persons: finalPersons,
+      relations: finalRelations,
+      events: allEvents,
+      errors,
+      fileName: fileArr.map(f => f.name).join(', ')
+    };
+  },
+
+  _parseJSONData(obj, fileName) {
+    const errors = [];
+    let persons = [], relations = [], events = [];
+    if (Array.isArray(obj)) persons = obj;
+    else if (obj && typeof obj === 'object') {
+      const P = obj.persons || obj['人物'] || obj.people || obj.nodes || [];
+      const R = obj.relations || obj['关系'] || obj.relationships || obj.edges || obj.links || [];
+      const E = obj.events || obj['事件'] || obj.timeline || [];
+      events = E;
+      // 兼容工程文件直接导入
+      if (!P.length && !R.length && (obj.data && (obj.data.persons || obj.data['人物']))) {
+        persons = obj.data.persons || []; relations = obj.data.relations || [];
+        events = obj.data.events || [];
+      } else { persons = P; relations = R; }
+    } else throw new Error(this.MSG.BROKEN);
+
+    const outP = [], outR = [], outE = [];
+    const seen = new Set();
+    persons.forEach((raw, i) => {
+      const m = this._mapKeys(raw, this.PERSON_HEADERS_JSON());
+      const lineNo = i + 1;
+      if (!m.id) { errors.push({ row: lineNo, table: '人物信息表', level: 'error', msg: '缺少必填字段【人物ID】' }); return; }
+      if (!m.name) { errors.push({ row: lineNo, table: '人物信息表', level: 'error', msg: `人物【${m.id}】缺少必填字段【人物姓名】` }); return; }
+      if (seen.has(m.id)) { errors.push({ row: lineNo, table: '人物信息表', level: 'error', msg: this.MSG.DUP_ID(m.id) }); return; }
+      seen.add(m.id);
+      outP.push(this._objToPerson(m));
+    });
+    relations.forEach((raw, i) => {
+      const m = this._mapKeys(raw, this.RELATION_HEADERS_JSON());
+      const lineNo = i + 1;
+      if (!m.sourceId || !m.targetId || !m.relationType) {
+        errors.push({ row: lineNo, table: '关系信息表', level: 'error', msg: '缺少必填字段【起始人物ID/目标人物ID/关系类型】' });
+        return;
+      }
+      outR.push(this._objToRelation(m));
+    });
+    (Array.isArray(events) ? events : []).forEach((raw, i) => {
+      const m = this._mapKeys(raw, this.EVENT_HEADERS);
+      const lineNo = i + 1;
+      if (!m.title) {
+        errors.push({ row: lineNo, table: '时间线事件表', level: 'error', msg: '缺少必填字段【事件名称】' });
+        return;
+      }
+      outE.push(this._objToEvent(m));
+    });
+    return { persons: outP, relations: outR, events: outE, errors };
+  },
+
+  _PERSON_JSON_KEYS: null,
+  PERSON_HEADERS_JSON() {
+    if (!this._PERSON_JSON_KEYS) {
+      this._PERSON_JSON_KEYS = {};
+      const alias = {
+        id: ['人物ID', 'id', 'ID', '编号'], name: ['人物姓名', '姓名', 'name', '名称'],
+        avatar: ['头像', '头像URL', 'avatar', '图片', 'photo'], intro: ['人物简介', '简介', 'intro', 'desc'],
+        tag: ['人物标签', '标签', 'tag', 'tags'], group: ['归属分组', '分组', 'group'],
+        gender: ['性别', 'gender'], age: ['年龄', 'age'], position: ['身份职位', '身份', '职位', 'position']
+      };
+      for (const f in alias) this._PERSON_JSON_KEYS[f] = alias[f];
+    }
+    return this._PERSON_JSON_KEYS;
+  },
+  RELATION_HEADERS_JSON() {
+    return {
+      sourceId: ['起始人物ID', 'sourceId', 'source', 'from', '起点'],
+      targetId: ['目标人物ID', 'targetId', 'target', 'to', '终点'],
+      relationType: ['关系类型', 'relationType', '关系', 'type'],
+      desc: ['关系描述', 'desc', '描述'], strength: ['关系强度', 'strength', '强度'],
+      time: ['关系时间', 'time', '时间'], note: ['备注', 'note']
+    };
+  },
+  _mapKeys(raw, map) {
+    const out = {};
+    if (!raw || typeof raw !== 'object') return out;
+    for (const k of Object.keys(raw)) {
+      const f = this._matchField(k, map) || (k in map ? k : null);
+      if (f && out[f] === undefined) out[f] = raw[k];
+    }
+    return out;
+  },
+
+  _objToPerson(m) {
+    return {
+      id: String(m.id).trim(),
+      name: String(m.name).trim(),
+      alias: String(m.alias || '').trim(),
+      avatar: String(m.avatar || '').trim(),
+      intro: String(m.intro || '').trim(),
+      tag: Utils.parseTags(m.tag),
+      group: String(m.group || '').trim(),
+      gender: String(m.gender || '').trim(),
+      age: m.age != null ? String(m.age).trim() : '',
+      position: String(m.position || '').trim()
+    };
+  },
+  _objToRelation(m) {
+    const num = Number(m.strength);
+    return {
+      sourceId: String(m.sourceId).trim(),
+      targetId: String(m.targetId).trim(),
+      relationType: String(m.relationType).trim() || '关联',
+      desc: String(m.desc || '').trim(),
+      // 0 = 未设置（解析自 Markdown/未填写的导入，不 clamp 到 1，否则所有关系强度统一变成 1）
+      strength: isNaN(num) ? 0 : Utils.clamp(Math.round(num), 0, 10),
+      time: String(m.time || '').trim(),
+      note: String(m.note || '').trim()
+    };
+  },
+
+  /* ============================================================
+     Markdown 剧情文档解析（.md / .markdown）
+     覆盖剧情梳理文档的典型结构：
+     ① 主要角色/人物条目（含英文名括注、——描述）
+     ② ASCII 家族世系树（├─ └─ →）
+     ③ 关系恩怨条目（A × B / A ↔ B / A → B + 部数出处 + 生下子女）
+     ④ 时间线条目（年代线 / 大事记 / 章节剧情）
+     ⑤ 表格（因果序表 / 各部登场速览表）
+     ⑥ 待考矛盾清单
+     ============================================================ */
+  parseMarkdown(text, fileName) {
+    const persons = [], relations = [], events = [], errors = [], infos = [];
+    const lines = String(text || '').split(/\r?\n/);
+    const seen = new Map();               // 人名 → person
+    let docTitle = '', defaultGroup = '';
+    let group = '', subsection = '', sectionRaw = '', inSynopsis = false;
+    // 每次解析使用唯一 ID 前缀：顺序 ID 在跨导入时会与画布中已有 MD### 冲突
+    const callToken = 'md' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6) + '_';
+    let inCode = false, codeBuf = [];
+    let chapterPending = null, introEvent = null;
+    let skipped = 0, seq = 0;
+    const skippedLines = [];
+
+    /* ---- 基础工具 ---- */
+    const stripMd = s => String(s || '').replace(/\*\*/g, '').replace(/`/g, '').trim();
+    const cleanText = s => stripMd(s).replace(/^[—–-\s]+|[—–-\s]+$/g, '').trim();
+    const NON_GROUP_HEAD = /主要角色|剧情梗概|详细剧情|备注|奖励章节/;
+    const GENERIC_NAME = /^(双胞胎|姐妹|兄弟|众人|一家|全家|两人|彼此|双方|三人组|四人组|众人|两位|众人|她们|他们|独立舞台)$/;
+    const stripMetaParens = s => s.replace(/[（(][^）)]*(?:第[\d\s、,，~～]+部|图鉴|世纪|年代|约\s*\d+|早夭|夭折|已故|亡故|CE|典藏)[^）)]*[）)]/g, '').trim();
+
+    const findOrCreate = (nameRaw, opts) => {
+      opts = opts || {};
+      let s = cleanText(nameRaw);
+      // 人名清洗：剥离引号；全角斜杠分隔的别名（"恶魔"（Demon）／父亲 → 恶魔 / 别名Demon、父亲）
+      s = s.replace(/["“”„«»「」『』]/g, '').trim();
+      let extraAlias = '';
+      const slashParts = s.split(/[／/]/).map(x => x.trim()).filter(Boolean);
+      if (slashParts.length >= 2) {
+        s = slashParts[0];
+        extraAlias = slashParts.slice(1).join('、');
+      }
+      let alias = extraAlias;
+      const en = s.match(/[（(]\s*([A-Za-z][A-Za-z0-9 .·''-]*)\s*[）)]\s*$/);
+      if (en) { alias = alias ? alias + '、' + en[1].trim() : en[1].trim(); s = s.slice(0, en.index).trim(); }
+      s = stripMetaParens(s).replace(/[。；;]/g, '').trim();
+      if (!s || s.length > 24 || GENERIC_NAME.test(s)) return null;
+      if (opts.nameOnly) return { name: s, alias };
+      let p = seen.get(s);
+      if (!p) {
+        const seg = s.split('·')[0];
+        if (seg) {
+          for (const [k, v] of seen) {
+            if (k.split('·')[0] === seg && !/[（(]/.test(k)) { p = v; break; }
+          }
+        }
+      }
+      if (!p && (alias || opts.alias)) {
+        // 别名分词合并：如"格雷"的别名"Gray，另处称约翰/John"指向已有人物"约翰·格雷"
+        const kinWord = /^(父亲|母亲|爸爸|妈妈|女儿|儿子|姐妹|兄弟|姐姐|妹妹|哥哥|弟弟|父|母|哥|姐|妹|弟)$/;
+        const tokens = String(alias || opts.alias || '').split(/[，,、/／\s|：:]+/)
+          .map(x => x.replace(/["“”]/g, '').trim()).filter(x => x.length >= 2 && !kinWord.test(x));
+        for (const tk of tokens) {
+          for (const [k, v] of seen) {
+            if (k.split('·')[0] === tk) { p = v; break; }
+          }
+          if (p) break;
+        }
+      }
+      if (p) {
+        // 合并：补全更完整的姓名 / 别名 / 简介
+        if (s.includes(p.name) && s.length > p.name.length) {
+          p.name = s; seen.set(s, p);
+        }
+        if (!p.alias && (alias || opts.alias)) p.alias = alias || opts.alias;
+        if (!p.intro && opts.intro) p.intro = opts.intro;
+        return p;
+      }
+      seq++;
+      p = {
+        id: callToken + seq,
+        name: s, alias: alias || (opts.alias || ''),
+        intro: opts.intro || '',
+        group: opts.group || group || defaultGroup,
+        tag: opts.tag || []
+      };
+      seen.set(s, p);
+      persons.push(p);
+      return p;
+    };
+
+    /* ---- 关系类型识别 ---- */
+    const REL_KW = [
+      ['夫妻', /成婚|结婚|结为夫妻|丈夫|妻子|配偶|婚姻|嫁入|迎娶|她的未婚夫|未婚夫|订婚/],
+      ['恋人', /恋人|定情|相恋|情侣|爱恋|初恋/],
+      ['养子', /养子|养女|收养/],
+      ['养兄妹', /养兄|养妹|养姐|养弟/],
+      ['龙凤胎', /龙凤胎/],
+      ['双胞胎', /双胞胎(?!女儿|儿子)/],
+      ['祖孙', /祖孙|孙女|孙子|曾孙|高祖父|曾祖父|高祖/],
+      ['父子', /父子/], ['父女', /父女/], ['母子', /母子/], ['母女', /母女/],
+      ['兄妹', /兄妹|姐弟|弟妹|姐弟关系/], ['姐妹', /姐妹(?!会)/], ['兄弟', /兄弟(?!会)/],
+      ['同窗', /同窗|同学|挚友|好友|密友|总角之好/],
+      ['师徒', /师徒|师从|弟子|导师/],
+      ['敌对', /敌对|宿敌|死敌|仇怨|世仇|决裂|对抗|击败|打败|挫败|阻止|夺舍|企图|复仇|报复|陷害|教唆|胁迫|杀害|毒杀|刺杀|恨|迫害/],
+      ['联手', /联手|并肩|合作|同盟|结盟|协助|相助|搭档/],
+      ['救赎', /救赎|拯救|救活|救下|洗冤|宽恕|治愈/],
+      ['君臣', /君臣/], ['主仆', /主仆|仆人|侍从|护卫|管家/],
+      ['亲属', /亲戚|亲属|远亲|后裔|血脉|同族|侄|外甥|姨妈|姑妈|叔|伯/],
+      ['创造', /制造的人造人|人造人|造物/],
+      ['依附', /附身|附体/],
+      ['对手', /对手|情敌/]
+    ];
+    const detectRelType = (text, isCouple) => {
+      // 按关键词在文本中最早出现位置判定（如"父子决裂。企图..." → 父子优先于敌对）
+      let best = null, bestIdx = Infinity;
+      for (const [t, re] of REL_KW) {
+        re.lastIndex = 0;
+        const m = re.exec(text);
+        if (m && m.index < bestIdx) { best = t; bestIdx = m.index; }
+      }
+      if (best) return best;
+      return isCouple ? '夫妻' : '关联';
+    };
+
+    /* ---- 子女提取（"生下X、Y" / "：女儿X"等明确生育表述，避免误匹配叙述文本） ---- */
+    const extractChildren = (desc) => {
+      const out = [];
+      const patterns = [
+        /(?:^|[，,;；。：:\s])(?:生下|育有|生有|诞下|产下)\s*([^。；;，,]{2,50})/g,
+        /(?:^|[：:])\s*(?:女儿|儿子|龙凤胎|双胞胎|孪生|子|孙|嗣)[\s:：]*([^。；;，,]{2,50})/g
+      ];
+      for (const re of patterns) {
+        re.lastIndex = 0;
+        let m;
+        while ((m = re.exec(desc))) {
+          for (let nm of m[1].split(/[、和与]/)) {
+            nm = stripMetaParens(cleanText(nm));
+            const en2 = nm.match(/[（(][^）)]*[）)]\s*$/);
+            if (en2) nm = nm.slice(0, en2.index).trim();
+            if (nm && nm.length <= 12 && !GENERIC_NAME.test(nm) && !/等|见各部|文本|注/.test(nm)) out.push(nm);
+          }
+        }
+      }
+      return [...new Set(out)];
+    };
+
+    const addRelation = (aRaw, bRaw, text, opts) => {
+      opts = opts || {};
+      const a = findOrCreate(aRaw, opts);
+      const b = findOrCreate(bRaw, opts);
+      if (!a || !b || a.id === b.id) return null;
+      const times = (text.match(/第[\d\s、,，~～]+部/g) || []).join('、');
+      // × 为配偶记法（"配偶与下一辈"），直接判定为夫妻
+      const type = opts.type || (opts.isCouple ? '夫妻' : detectRelType(text, false));
+      const rel = { sourceId: a.id, targetId: b.id, relationType: type, desc: cleanText(text).slice(0, 200), strength: 0, time: times };
+      relations.push(rel);
+      // 子女提取：由夫妇双方建立亲子关系
+      if (!opts.noChild) {
+        for (const cn of extractChildren(text)) {
+          const c = findOrCreate(cn, {});
+          if (c && c.id !== a.id && c.id !== b.id) {
+            relations.push({ sourceId: a.id, targetId: c.id, relationType: '亲子', desc: (a.name + '与' + b.name + '的子女'), strength: 0, time: times });
+            if (b && !opts.singleParent) relations.push({ sourceId: b.id, targetId: c.id, relationType: '亲子', desc: (a.name + '与' + b.name + '的子女'), strength: 0, time: times });
+          }
+        }
+      }
+      return rel;
+    };
+
+    /* ---- ASCII 家族树解析 ---- */
+    const parseNodeText = (txt) => {
+      // 返回 {label, name, note} —— label 如 "第一任妻子"/"养子"，note 为括注补充说明
+      let s = cleanText(txt);
+      let label = '';
+      const lm = s.match(/^([^:：]{1,8})[:：]\s*(.+)$/);
+      if (lm && /妻子|丈夫|夫|妻|养子|养女|儿子|女儿|继承人|家长|族|家/.test(lm[1])) {
+        label = lm[1]; s = lm[2].trim();
+      }
+      const en = s.match(/[（(]\s*([A-Za-z][A-Za-z0-9 .·''-]*)\s*[）)]\s*$/);
+      let alias = '';
+      if (en) { alias = en[1].trim(); s = s.slice(0, en.index).trim(); }
+      // 括注：元信息（部数/图鉴等）丢弃，描述性内容（如"理查德之父"）转入 note
+      let note = '';
+      s = s.replace(/[（(]([^）)]*)[）)]/g, (all, inner) => {
+        if (/[（(]/.test(inner)) return all;
+        if (/(?:第\s*\d+\s*部|图鉴|世纪|年代|约\s*\d+|早夭|夭折|已故|CE|典藏)/.test(inner)) return '';
+        note = inner.trim();
+        return '';
+      });
+      return { label, name: s.trim(), alias, note };
+    };
+    const parseTreeBlock = (codeText) => {
+      const tLines = codeText.split(/\r?\n/);
+      let stack = [];
+      for (const raw of tLines) {
+        const line = raw.replace(/\t/g, '    ');
+        if (!line.trim()) continue;
+        const idx = line.search(/[├└]─/);
+        if (idx < 0) {
+          const txt = cleanText(line.replace(/[│├└─]/g, ' '));
+          if (!txt || /…{2,}|\.{3,}|文本未/.test(txt)) continue;
+          // 根行 / 链式行（含 → 的整行按链处理）
+          if (txt.includes('→')) { parseChainLine(txt); stack = []; continue; }
+          const p = parseNodeText(txt);
+          const person = p.name && !GENERIC_NAME.test(p.name) ? findOrCreate(p.name, { alias: p.alias, intro: p.label ? p.label : '' }) : null;
+          stack = person ? [person] : [];
+          continue;
+        }
+        const level = Math.max(1, Math.round(idx / 4) + 1);
+        const txt = cleanText(line.slice(idx + 2));
+        if (!txt || /…{2,}/.test(txt) && !/[\u4e00-\u9fa5]{2,}/.test(txt.replace(/[…]/g, ''))) continue;
+        const parent = stack[level - 1] || stack[stack.length - 1] || null;
+        const node = makeTreeNode(txt, parent);
+        stack[level] = node;
+        stack.length = level + 1;
+      }
+    };
+    const makeTreeNode = (txt, parent) => {
+      // 单节点（可能带 → 子女链）；过滤省略号注释段
+      const segs = txt.split('→').map(s => cleanText(s))
+        .filter(s => s && !/^…/.test(s) && !/见各部|文本未/.test(s));
+      const head = parseNodeText(segs[0] || '');
+      // 树头多名字（如"伊丽莎白、詹姆斯"）拆为同辈多人
+      let headNames = [head];
+      if (!head.label && /[、]/.test(head.name)) {
+        const parts = head.name.split(/[、]/).map(x => stripMetaParens(cleanText(x))).filter(x => x && !GENERIC_NAME.test(x) && x.length <= 14);
+        if (parts.length > 1) headNames = parts.map(x => ({ label: '', name: x, alias: '', note: head.note }));
+      }
+      const headPersons = [];
+      for (const hn of headNames) {
+        const person = hn.name && !GENERIC_NAME.test(hn.name)
+          ? findOrCreate(hn.name, { alias: hn.alias, intro: hn.note || '' }) : null;
+        if (person && parent && parent.id !== person.id) {
+          const type = /妻|嫁|夫/.test(hn.label) ? '夫妻' : /养子|养女|收养/.test(hn.label) ? '养子' : '亲子';
+          relations.push({
+            sourceId: parent.id, targetId: person.id, relationType: type,
+            desc: (hn.label ? hn.label + '：' : '家族世系：') + person.name + (hn.note ? '（' + hn.note + '）' : ''),
+            strength: 0, time: ''
+          });
+        }
+        if (person) headPersons.push(person);
+      }
+      const person = headPersons[0] || null;
+      // 其余段：配偶名下子女 / 链式后代
+      let chainFrom = person;
+      const spouseHead = /妻|嫁|夫/.test(head.label);
+      for (let i = 1; i < segs.length; i++) {
+        const seg = segs[i];
+        // 形如 "双胞胎女儿:伊芙琳、多萝西(早夭)" 或 "(抱回的"儿子")爱德华" 或 "安娜、路易莎、娜塔莉亚"
+        let label = '', namesPart = seg, hasLabel = false;
+        const lm = seg.match(/^([^:：]{1,10})[:：]\s*(.+)$/);
+        if (lm && !/[（(]/.test(lm[1])) { label = lm[1]; namesPart = lm[2]; hasLabel = true; }
+        const pm = namesPart.match(/^[（(]([^）)]{1,14})[）)]\s*(.+)$/);
+        if (pm) { label = label || pm[1]; namesPart = pm[2]; hasLabel = true; }
+        const kids = namesPart.split(/[、，,]/).map(x => stripMetaParens(cleanText(x))).filter(x => x && !GENERIC_NAME.test(x) && x.length <= 14);
+        if (!kids.length) continue;
+        const relType = /妻|嫁/.test(label) ? '夫妻'
+          : /孙女|孙子/.test(label) ? '祖孙'
+          : /养|嗣/.test(label) ? '养子'
+          : /女/.test(label) ? '母女'
+          : /儿|子/.test(label) ? '父子'
+          : '亲子';
+        let lastKid = null;
+        for (const kn of kids) {
+          let knAlias = '', knName = kn;
+          const en3 = kn.match(/[（(]\s*([A-Za-z][^）)]*)\s*[）)]\s*$/);
+          if (en3) { knAlias = en3[1]; knName = kn.slice(0, en3.index).trim(); }
+          const kid = findOrCreate(knName, { alias: knAlias });
+          if (!kid || !chainFrom || kid.id === chainFrom.id) continue;
+          relations.push({
+            sourceId: chainFrom.id, targetId: kid.id, relationType: relType,
+            desc: (label ? label + '：' : '家族世系：') + kid.name,
+            strength: 0, time: ''
+          });
+          // 树上层节点（父系）同样建立亲子关系，构成完整家族树
+          if (spouseHead && parent && parent.id !== chainFrom.id && parent.id !== kid.id) {
+            relations.push({
+              sourceId: parent.id, targetId: kid.id, relationType: '亲子',
+              desc: parent.name + '与' + chainFrom.name + '的子女',
+              strength: 0, time: ''
+            });
+          }
+          lastKid = kid;
+        }
+        // 仅当本段为单个名字（链式后代）时推进挂靠点；同辈子女组不推进
+        if (lastKid && kids.length === 1) chainFrom = lastKid;
+      }
+      return person;
+    };
+    const parseChainLine = (txt) => {
+      // 根级链式行：麦克斯韦家:查尔斯 →(抱回的"儿子")爱德华 →……→ 凯瑟琳(爱德华的孙女)
+      const segs = txt.split('→').map(s => cleanText(s)).filter(s => s && !/^…+$/.test(s) && !/见各部|文本/.test(s));
+      let prev = null;
+      for (const seg of segs) {
+        const node = makeTreeNode(seg, prev);
+        if (node) prev = node;
+      }
+    };
+
+    /* ---- 表格解析 ---- */
+    const parseTableBlock = (rows) => {
+      if (rows.length < 2) { skipped += rows.length; return; }
+      const header = rows[0].map(c => stripMd(c).trim());
+      const body = rows.slice(1);
+      if (header.includes('顺位')) {
+        for (const r of body) {
+          const order = Number(stripMd(r[0])) || 0;
+          const title = stripMd(r[1] || '');
+          if (!title) continue;
+          events.push({ id: '', title: title, time: '', order, era: subsection || '因果序', desc: stripMd(r[2] || ''), persons: [] });
+        }
+      } else if (stripMd(header[0]) === '部' && header.join('|').includes('登场人物')) {
+        for (const r of body) {
+          const m = stripMd(r[0]).match(/^(\d+)\s*(.*)$/);
+          const num = m ? m[1] : '', nm = m ? m[2] : stripMd(r[0]);
+          if (!nm) continue;
+          events.push({
+            id: '', title: `第${num}部《${nm}》`, time: '', order: Number(num) || 0,
+            era: '各部登场速览',
+            desc: `主要登场人物：${stripMd(r[1] || '')}${r[2] ? '；与格雷家的关系：' + stripMd(r[2]) : ''}`,
+            persons: []
+          });
+        }
+      } else if (header.some(h2 => /姓名|人物|名字|角色/.test(stripMd(h2)))) {
+        // 通用人物表：首列为姓名，其余列并入简介
+        for (const r of body) {
+          const nm = stripMd(r[0] || '').trim();
+          if (!nm || nm.length > 20) continue;
+          const desc2 = header.slice(1).map((h2, i3) => {
+            const v = stripMd(r[i3 + 1] || '');
+            return v ? h2 + '：' + v : '';
+          }).filter(Boolean).join('；');
+          persons.push({ id: '', name: nm, alias: '', intro: desc2, group: group || defaultGroup, tag: [] });
+        }
+      } else skipped += body.length;
+    };
+
+    /* ---- 时间线 / 章节事件条目 ---- */
+    const isEventCtx = () => /时间线|年代线|大事记|因果序|待考|矛盾|家族与阵营|登场速览|速查|备注|奖励章节|章节|玩法/.test(subsection + group + sectionRaw);
+    const addEventBullet = (raw) => {
+      const text = stripMd(raw);
+      if (!text) return;
+      let title = '', rest = '';
+      const bm = text.match(/^\*\*(.+?)\*\*\s*[:：]?\s*(.*)$/);
+      if (bm) { title = bm[1].trim(); rest = (bm[2] || '').trim(); }
+      else {
+        const cm = text.match(/^([^：:]{2,30})[:：]\s*(.+)$/);
+        if (cm) { title = cm[1].trim(); rest = cm[2].trim(); }
+      }
+      if (!title) { title = text.split(/[，,;；。]/)[0].slice(0, 24); rest = text; }
+      // 标题即时间（如"2003年"）且存在描述 → 用描述首句作标题，避免标题与时间重复
+      if (rest && /^(约\s*)?[\d一二三两]{1,4}\s*年(代)?$|^(中世纪|远古|当代|现代|早期|晚期)$/.test(title)) {
+        const t2 = rest.split(/[，,。;；]/)[0].trim();
+        if (t2 && t2.length > title.length) title = t2.slice(0, 24);
+      }
+      if (/^(备注|注)[:：]/.test(text)) return;
+      let time = '';
+      if (/年|世纪|代$/.test(title) && title.length <= 20) time = title;
+      if (!time) {
+        const ym = rest.match(/(约\s*)?\d{1,4}\s*年(?:代)?(?:\s*[–—-]\s*(约\s*)?\d{1,4}\s*年)?|\d+\s*世纪|中世纪|远古|当代/);
+        if (ym) time = ym[0];
+      }
+      events.push({ id: '', title: title.slice(0, 40), time, order: 0, era: (subsection || (/备注|奖励章节/.test(sectionRaw) ? sectionRaw : group)) || '时间线', desc: text, persons: [] });
+    };
+
+    /* ================= 主循环 ================= */
+    let tableBuf = [];
+    const flushTable = () => {
+      if (tableBuf.length) { parseTableBlock(tableBuf); tableBuf = []; }
+    };
+
+    for (let li = 0; li < lines.length; li++) {
+      const rawLine = lines[li];
+      const line = rawLine.trim();
+
+      /* 代码块（家族树） */
+      if (/^```/.test(line)) {
+        if (inCode) { parseTreeBlock(codeBuf.join('\n')); codeBuf = []; inCode = false; }
+        else { flushTable(); inCode = true; }
+        continue;
+      }
+      if (inCode) { codeBuf.push(rawLine); continue; }
+
+      /* 空行 / 表格缓冲 */
+      if (!line) { flushTable(); if (chapterPending && !chapterPending.desc) { /* 继续等待 */ } continue; }
+
+      /* 标题 */
+      const hMatch = line.match(/^(#{1,6})\s+(.+)$/);
+      if (hMatch) {
+        flushTable();
+        const level = hMatch[1].length;
+        const h = cleanText(hMatch[2]);
+        if (level === 1) {
+          docTitle = h;
+          defaultGroup = h.replace(/[《》【】]/g, '').split(/[:：]/)[0].slice(0, 20) || '剧情文档';
+          group = '';
+          // 多文档合并解析时以一级标题作为文档边界：重置梗概/章节上下文，
+          // 保证每篇文档的"剧情梗概"事件独立生成，不被上一文档的状态遮挡
+          inSynopsis = false;
+          introEvent = null;
+          continue;
+        }
+        if (level <= 2) {
+          const cleaned = h.replace(/^[一二三四五六七八九十\d]+[、.．]\s*/, '').replace(/[（(].*?[）)]$/g, '').trim();
+          sectionRaw = h;
+          inSynopsis = /剧情梗概/.test(h);
+          // 非分组性标题（主要角色/剧情等）沿用文档级分组
+          group = NON_GROUP_HEAD.test(h) ? defaultGroup : (cleaned || defaultGroup);
+          subsection = '';
+          // 结局 / 尾声 / 奖励章节 等叙事小节 → 直接生成事件（后续段落填充描述）
+          if (/^(结局|尾声|奖励章节|番外)/.test(h)) {
+            const ev = { id: '', title: h, time: '', order: 0, era: (defaultGroup || '剧情文档') + ' · 章节', desc: '', persons: [] };
+            events.push(ev);
+            chapterPending = ev;
+          } else {
+            chapterPending = null;
+          }
+        } else {
+          subsection = h.replace(/^[一二三四五六七八九十\d]+(?:\.\d+)?[、.．]\s*/, '').trim();
+          chapterPending = null;
+          // 详细剧情章节 → 事件
+          if (/详细剧情|剧情章节/.test(sectionRaw) && subsection) {
+            const ev = { id: '', title: subsection.replace(/^[一二三四五六七八九十]+[、.．]\s*/, ''), time: '', order: 0, era: (defaultGroup || '剧情文档') + ' · 章节', desc: '', persons: [] };
+            events.push(ev);
+            chapterPending = ev;
+          } else if (/奖励章节|备注/.test(subsection)) {
+            chapterPending = null;
+          }
+        }
+        continue;
+      }
+
+      /* 表格行 */
+      if (/^\|/.test(line)) {
+        if (/^\|[\s:|-]+\|?$/.test(line)) continue; // 分隔行
+        tableBuf.push(line.split('|').slice(1, -1).map(c => c.trim()));
+        continue;
+      }
+      flushTable();
+
+      /* 引用行：填充章节描述 */
+      if (/^>\s?/.test(line)) {
+        if (chapterPending && !chapterPending.desc) {
+          chapterPending.desc = cleanText(line.replace(/^>\s?/, '')).slice(0, 160);
+        }
+        continue;
+      }
+
+      /* 普通段落 */
+      if (!/^[-*•]\s|^\d+[.、)]\s/.test(line)) {
+        if (chapterPending && !chapterPending.desc) {
+          chapterPending.desc = cleanText(line).slice(0, 160);
+          continue;
+        }
+        if (inSynopsis && !introEvent && line.length > 30) {
+          introEvent = { id: '', title: '剧情梗概', time: '', order: -1, era: '剧情梗概', desc: cleanText(line).slice(0, 400), persons: [] };
+          events.push(introEvent);
+        }
+        continue;
+      }
+
+      /* ---------- 列表条目 ---------- */
+      const itemText = line.replace(/^[-*•]\s+/, '').replace(/^\d+[.、)]\s+/, '').trim();
+      if (!itemText) continue;
+
+      // ① 时间线/阵营/待考上下文 → 事件
+      if (isEventCtx()) {
+        addEventBullet(itemText);
+        continue;
+      }
+
+      // ② 关系条目：A × B / A ↔ B（支持多人链 安娜 ↔ 路易莎 ↔ 娜塔莉亚）
+      if (/[×↔]/.test(itemText)) {
+        // 括号深度感知：找到深度为 0 的第一个冒号位置
+        const findTopColon = (s2) => {
+          let depth = 0;
+          for (let ci = 0; ci < s2.length; ci++) {
+            const ch = s2[ci];
+            if (ch === '（' || ch === '(') depth++;
+            else if (ch === '）' || ch === ')') depth = Math.max(0, depth - 1);
+            else if ((ch === '：' || ch === ':') && depth === 0) return ci;
+          }
+          return -1;
+        };
+        const pieces = itemText.split(/([×↔])/);
+        const names = [], seps = [];
+        for (let pi = 0; pi < pieces.length; pi++) {
+          if (pieces[pi] === '×' || pieces[pi] === '↔') { seps.push(pieces[pi]); continue; }
+          const seg2 = pieces[pi];
+          if (!seg2.trim()) continue;
+          const colonIdx = findTopColon(seg2);
+          names.push(colonIdx >= 0 ? seg2.slice(0, colonIdx) : seg2);
+        }
+        for (let k2 = 0; k2 < seps.length; k2++) {
+          if (!names[k2] || !names[k2 + 1]) continue;
+          addRelation(names[k2], names[k2 + 1], itemText, { isCouple: seps[k2] === '×' });
+        }
+        continue;
+      }
+
+      // ③ 人物条目：**名称**：描述 / 名称(EN)——描述 / 名称：描述
+      let pName = '', pIntro = '', pAlias = '';
+      // ③a 多人并列条目（"**A**(注)、**B**(注)、C(注)：描述"）→ 拆分为多个人物
+      {
+        let depth = 0, topColon = -1;
+        for (let ci = 0; ci < itemText.length; ci++) {
+          const ch = itemText[ci];
+          if (ch === '（' || ch === '(') depth++;
+          else if (ch === '）' || ch === ')') depth = Math.max(0, depth - 1);
+          else if ((ch === '：' || ch === ':') && depth === 0) { topColon = ci; break; }
+        }
+        if (topColon > 0 && !/[×↔]/.test(itemText)) {
+          const left = itemText.slice(0, topColon);
+          const bolds = [...left.matchAll(/\*\*(.+?)\*\*/g)].map(m => m[1].trim()).filter(Boolean);
+          if (bolds.length >= 2 && left.length <= 80) {
+            const intro2 = cleanText(itemText.slice(topColon + 1)).slice(0, 300);
+            for (const bn of bolds) {
+              let nm2 = bn, al2 = '';
+              const qual2 = nm2.match(/[（(]([^）)]*)[）)]\s*$/);
+              if (qual2 && !/^[A-Za-z]/.test(qual2[1])) {
+                const keep2 = qual2[1].replace(/第[\d\s、,，~～]+部|图鉴|典藏|CE|收藏/g, '').replace(/^[，,、;；\s]+|[，,、;；\s]+$/g, '').trim();
+                nm2 = nm2.slice(0, qual2.index).trim();
+                if (keep2) nm2 = nm2 + '(' + keep2 + ')';
+              }
+              const slash = nm2.split('/');
+              if (slash.length === 2 && slash.every(x => x.trim().length >= 2)) { nm2 = slash[0].trim(); al2 = slash[1].trim(); }
+              if (nm2 && nm2.length <= 16 && !GENERIC_NAME.test(nm2)) findOrCreate(nm2, { alias: al2, intro: intro2 });
+            }
+            continue;
+          }
+        }
+      }
+      const bold = itemText.match(/^\*\*(.+?)\*\*\s*[:：]?\s*(.*)$/);
+      if (bold) {
+        pName = bold[1]; pIntro = (bold[2] || '').trim();
+      } else {
+        // 括号深度感知定位第一个 ——/—/：/: 分隔符，人名长度不受限
+        let depth = 0, sepIdx = -1;
+        for (let ci = 0; ci < itemText.length; ci++) {
+          const ch = itemText[ci];
+          if (ch === '（' || ch === '(') depth++;
+          else if (ch === '）' || ch === ')') depth = Math.max(0, depth - 1);
+          else if (depth === 0 && (ch === '—' || ch === '：' || ch === ':')) { sepIdx = ci; break; }
+        }
+        if (sepIdx > 0 && !/^\d/.test(itemText)) {
+          pName = itemText.slice(0, sepIdx);
+          pIntro = itemText.slice(sepIdx + (itemText[sepIdx + 1] === '—' ? 2 : 1)).trim();
+        }
+      }
+      if (pName) {
+        // 括注处理：剥离部数/图鉴等元信息，保留地域/称号限定词（如"斯通韦尔"、"伯爵"）
+        const qual = pName.match(/[（(]([^）)]*)[）)]\s*$/);
+        let cleaned = cleanText(pName).replace(/[（(][^）)]*[）)]\s*$/, '').trim();
+        let keep = '';
+        if (qual) {
+          if (/^[A-Za-z]/.test(qual[1])) {
+            pAlias = pAlias || qual[1].trim();
+          } else {
+            // 仅保留短限定词（如"斯通韦尔"、"伯爵"、"白夫人"），长描述性括注丢弃
+            keep = qual[1].replace(/第[\d\s、,，~～]+部|图鉴|典藏|CE|收藏/g, '')
+              .replace(/^[，,、;；\s]+|[，,、;；\s]+$/g, '').trim();
+            if (keep.length > 6 || /[文本未给出名字角，]/.test(keep)) keep = '';
+          }
+        }
+        if (keep) cleaned = cleaned + '(' + keep + ')';
+        const en = cleaned.match(/[（(]\s*([A-Za-z][A-Za-z0-9 .·''-]*)\s*[）)]\s*$/);
+        if (en) { pAlias = pAlias || en[1].trim(); cleaned = cleaned.slice(0, en.index).trim(); }
+        // 并列多人名（"克莱尔、罗德尼" / "萨拉(Sarah)、凯特"）拆分为独立人物
+        if (/[、]/.test(cleaned) && cleaned.length <= 30) {
+          const parts = cleaned.split(/[、]/).map(x => cleanText(x)).filter(Boolean);
+          const parsedParts = [];
+          for (let part of parts) {
+            let partAlias = '';
+            const en2 = part.match(/[（(]\s*([A-Za-z][^）)]*)\s*[）)]\s*$/);
+            if (en2) { partAlias = en2[1].trim(); part = part.slice(0, en2.index).trim(); }
+            else {
+              const q2 = part.match(/[（(]([^）)]*)[）)]\s*$/);
+              if (q2) {
+                const keep3 = q2[1].replace(/第[\d\s、,，~～]+部|图鉴|典藏|CE|收藏/g, '').replace(/^[，,、;；\s]+|[，,、;；\s]+$/g, '').trim();
+                part = part.slice(0, q2.index).trim();
+                if (keep3 && keep3.length <= 6 && !/[文本未给出名字角，]/.test(keep3)) part = part + '(' + keep3 + ')';
+              }
+            }
+            part = part.replace(/["“”]/g, '').trim();
+            if (part && part.length <= 16 && !GENERIC_NAME.test(part)) parsedParts.push({ name: part, alias: partAlias });
+          }
+          if (parsedParts.length > 1) {
+            for (const it of parsedParts) findOrCreate(it.name, { alias: it.alias, intro: cleanText(pIntro).slice(0, 300) });
+            continue;
+          }
+        }
+        const p = findOrCreate(cleaned, { alias: pAlias, intro: cleanText(pIntro).slice(0, 300) });
+        if (p) continue;
+      }
+
+      // ④ 无法识别 → 跳过计数（记录行号与原文便于定位）
+      skipped++;
+      skippedLines.push({ no: li + 1, text: cleanText(line).slice(0, 40) });
+    }
+    flushTable();
+    if (inCode && codeBuf.length) parseTreeBlock(codeBuf.join('\n'));
+
+    /* ---------- 后置处理 ---------- */
+    // 事件关联人物：扫描事件文本中出现的已有人物名（长名优先，含"·"分段短名）
+    {
+      const cands = [];
+      for (const p of persons) {
+        cands.push({ name: p.name, idx: persons.indexOf(p) });
+        const seg = p.name.split('·')[0];
+        if (seg.length >= 2 && seg !== p.name && !/[（(]/.test(seg)) cands.push({ name: seg, idx: persons.indexOf(p) });
+      }
+      cands.sort((a, b) => b.name.length - a.name.length);
+      for (const ev of events) {
+        const ids = new Set();
+        const hay = ev.title + '；' + ev.desc;
+        for (const c of cands) {
+          if (c.name.length >= 2 && hay.includes(c.name)) ids.add(persons[c.idx].id);
+        }
+        ev.persons = [...new Set([...(ev.persons || []), ...[...ids]])].slice(0, 14);
+      }
+    }
+    // 占位名合并：各部对同一主角的称谓（女主角/主角/玩家角色/纯称谓名）合并为同一人物
+    {
+      const isPlaceholder = (nm) => /^(女主角|主角|玩家角色|侦探)$/.test(nm);
+      const isKinOnly = (nm) => /^(姨妈|姑妈|叔叔|舅舅|伯伯|婶婶|堂兄|堂弟|表哥|表姐|表妹|外甥|外甥女|侄女|侄子)$/.test(nm);
+      let proto = persons.find(p => isPlaceholder(p.name)) ||
+                  persons.find(p => isKinOnly(p.name) && /女主角|侦探|玩家/.test(p.intro));
+      if (proto) {
+        const merges = persons.filter(p => p !== proto &&
+          (isPlaceholder(p.name) || (isKinOnly(p.name) && /女主角|侦探|玩家|系列侦探/.test(p.intro))));
+        for (const mp of merges) {
+          if (!proto.alias && mp.alias) proto.alias = mp.alias;
+          if (proto.intro.length < mp.intro.length && mp.intro) proto.intro = mp.intro;
+          for (const r of relations) {
+            if (r.sourceId === mp.id) r.sourceId = proto.id;
+            if (r.targetId === mp.id) r.targetId = proto.id;
+          }
+          for (const e of events) e.persons = (e.persons || []).map(x => x === mp.id ? proto.id : x);
+          for (const [k, v] of seen) if (v === mp) seen.set(k, proto);
+          persons.splice(persons.indexOf(mp), 1);
+        }
+        // 清理合并后产生的自环
+        for (let i = relations.length - 1; i >= 0; i--) {
+          if (relations[i].sourceId === relations[i].targetId) relations.splice(i, 1);
+        }
+      }
+    }
+    // 人物简介亲属关系挖掘（”路易莎之妹” / “杰姬之父” / “安娜最亲爱的妹妹” / “主角妹妹”）
+    {
+      const KIN_WORDS = '双胞胎女儿|双胞胎儿子|高祖父|高祖母|曾祖父|曾祖母|外祖父|外祖母|祖父|祖母|爷爷|奶奶|姑婆|父亲|母亲|爸爸|妈妈|父|母|女儿|儿子|养女|养子|养父|养母|继父|继母|继女|继子|姐姐|妹妹|姐|妹|哥哥|弟弟|兄|弟|兄长|未婚夫|未婚妻|女友|男友|恋人|丈夫|妻子|夫人|妻|夫|侄女|侄子|外甥|外甥女|孙子|孙女|曾孙|曾孙女|姑妈|姑姑|叔叔|伯伯|舅舅|姨妈|姨母|嫂子|堂兄|堂弟|表哥|表弟|表姐|表妹|父母|子(?![\u4e00-\u9fa5])|女(?![\u4e00-\u9fa5])|帮手|保姆|管家|助手|搭档|顾问|司机|保镖|合伙人|学生|老师|师父|徒弟';
+      const KIN_RULES = [
+        [/^(父亲|母亲|爸爸|妈妈|父|母|养父|养母|继父|继母|父母)$/, '亲子', 'parentOf'],
+        [/^(女儿|儿子|养女|养子|继女|继子|子|女|双胞胎女儿|双胞胎儿子)$/, '亲子', 'childOf'],
+        [/^(姐姐|妹妹|姐|妹|姐妹)$/, '姐妹', 'pair'],
+        [/^(哥哥|弟弟|兄|弟|兄长|兄弟)$/, '兄弟', 'pair'],
+        [/^(未婚夫|未婚妻|女友|男友|恋人|丈夫|妻子|夫人|妻|夫)$/, '夫妻', 'pair'],
+        [/^(高祖父|高祖母|曾祖父|曾祖母|外祖父|外祖母|祖父|祖母|爷爷|奶奶|姑婆|侄女|侄子|外甥|外甥女|孙子|孙女|曾孙|曾孙女|姑妈|姑姑|叔叔|伯伯|舅舅|姨妈|姨母|嫂子|堂兄|堂弟|表哥|表弟|表姐|表妹)$/, '亲属', 'pair'],
+        [/^(保姆|管家|助手|搭档|顾问|司机|保镖|合伙人|学生|老师|师父|徒弟|帮手)$/, '关联', 'pair']
+      ];
+      const NAME_PART = '(?:(?!的|之|与)[\u4e00-\u9fa5·]){2,10}';
+      const findRefAll = (nm) => {
+        nm = String(nm || '').replace(/[““”]/g, '').trim();
+        if (!nm) return [];
+        let hit = seen.get(nm) || null;
+        if (hit) return [hit];
+        const seg = nm.split('·')[0];
+        const segHits = [];
+        for (const [k, v] of seen) {
+          if (k.split('·')[0] === seg && !/[（(]/.test(k)) segHits.push(v);
+        }
+        if (segHits.length) return segHits.length === 1 ? segHits : [];
+        if (nm.length >= 2) {
+          const revHits = [];
+          for (const [k, v] of seen) {
+            if (k.includes(nm) && !/[（(]/.test(k)) revHits.push(v);
+          }
+          if (revHits.length === 1) return revHits;
+        }
+        const cands = persons.filter(pp => pp.name.length >= 2 && nm.includes(pp.name))
+          .sort((a, b) => b.name.length - a.name.length);
+        if (cands.length) return [cands[0]];
+        // 别名匹配："劳拉" → 白夫人（别名 劳拉·曼斯菲尔德）
+        const aliasExact = [], aliasSub = [];
+        for (const pp of persons) {
+          const al = (pp.alias || '').toLowerCase();
+          if (!al) continue;
+          if (al === nm.toLowerCase()) aliasExact.push(pp);
+          else if (al.includes(nm) && nm.length >= 2) aliasSub.push(pp);
+        }
+        if (aliasExact.length === 1) return aliasExact;
+        if (aliasSub.length === 1) return aliasSub;
+        if (/主角/.test(nm)) {
+          for (const pp of persons) if (pp.name.includes('主角')) return [pp];
+        }
+        // 复数称谓："麦克格雷姐弟" → 家族姓氏匹配的多个人物
+        if (/姐弟|兄妹|姐妹|兄弟|夫妇|夫妻|父母|俩|三人|孩子们/.test(nm)) {
+          const base = nm.replace(/姐弟|姐妹|兄弟|姐妹|夫妇|夫妻|父母|俩|三人|孩子们|的/g, '');
+          if (base.length >= 2) {
+            const fam = [];
+            for (const pp of persons) {
+              if (pp.name.includes(base) || (pp.alias || '').includes(base)) fam.push(pp);
+            }
+            if (fam.length > 1) return fam;
+          }
+        }
+        return [];
+      };
+      const findRef = (nm) => findRefAll(nm)[0] || null;
+      const relPushed = (a, b) => relations.some(r => (r.sourceId === a && r.targetId === b) || (r.sourceId === b && r.targetId === a));
+      // 本篇主角识别（供亲属指代与占位名解析）
+      const isPH = (nm) => /^(女主角|主角|玩家角色|侦探)(（[^）]*）|\([^)]*\))?$/.test(nm);
+      const protagonist = persons.find(p => isPH(p.name)) ||
+                          persons.find(p => /女主角|玩家角色/.test(p.intro)) ||
+                          persons.find(p => /(?:^|[，,、；;])\s*主角/.test(p.intro || '')) ||
+                          persons.find(p => /(?:^|[，,、；;])\s*(?:著名|私人)?侦探/.test(p.intro || '')) || null;
+      // 兜底启发：被其他人物简介引用最多的人物视为主角
+      if (!protagonist && persons.length >= 3) {
+        const mention = new Map();
+        for (const pp of persons) {
+          const variants = [pp.name, ...(pp.name.split('·').filter(s2 => s2.length >= 2)), (pp.alias || '')].filter(Boolean);
+          let cnt = 0;
+          for (const other of persons) {
+            if (other === pp || !other.intro) continue;
+            for (const v of variants) if (other.intro.includes(v)) { cnt++; break; }
+          }
+          if (cnt > 0) mention.set(pp, cnt);
+        }
+        let best = null, bestC = 0;
+        for (const [pp, c] of mention) if (c > bestC) { best = pp; bestC = c; }
+        var hubProtagonist = best || null;
+      } else {
+        var hubProtagonist = null;
+      }
+      const protagonistFinal = protagonist || hubProtagonist;
+      const resolveKinRefs = (nm) => {
+        const refs = findRefAll(nm);
+        if (!refs.length && protagonistFinal && /^(女主角|主角|玩家角色|侦探)$/.test(nm)) return [protagonistFinal];
+        return refs;
+      };
+      // 主连接词匹配：X之/的(+修饰)(+亲爱的)(kin)
+      for (const p of persons) {
+        if (!p.intro) continue;
+        const introKin = p.intro.replace(/["“”]/g, ''); // 去引号扫描（如 安娜的"毒舌顾问"）
+        const re = new RegExp('(' + NAME_PART + ')[^。，；;，,]{0,14}?(?:之|的)(?:亲生|前任|第[一二三四五六七八九十]+任|前|新|旧|养|继|亡|生|孪生|双胞胎|双|大|亲)?(?:最|很|超|真)?(?:亲爱的?)?(' + KIN_WORDS + ')', 'g');
+        let m;
+        while ((m = re.exec(introKin))) {
+          let refs = resolveKinRefs(m[1]);
+          // 敌对语境守卫："曾陷害林晚秋之父"——句中含陷害/谋杀等动词时不做亲子推断
+          if ((m[2] === '父' || m[2] === '母' || m[2] === '父亲' || m[2] === '母亲' || m[2] === '爸爸' || m[2] === '妈妈') &&
+              /陷害|谋杀|杀害|暗杀|袭击|报仇|复仇|针对|嫁祸|栽赃/.test(introKin.slice(Math.max(0, m.index - 6), m.index + m[0].length + 6))) continue;
+          // "路易莎与约翰之子" → 双亲各自建立亲子关系
+          if (refs.length === 1 && /[与和]/.test(m[1])) {
+            for (const pp of persons) {
+              const seg0 = pp.name.split('·')[0];
+              if (seg0.length >= 2 && seg0.length <= 6 && m[1].includes(seg0) && !refs.some(r2 => r2.id === pp.id)) refs.push(pp);
+            }
+          }
+          if (!refs.length) continue;
+          for (const ref of refs) {
+            if (ref.id === p.id || relPushed(ref.id, p.id)) continue;
+            for (const [kinRe, type, dir] of KIN_RULES) {
+              if (!kinRe.test(m[2])) continue;
+              if (dir === 'parentOf') {
+                relations.push({ sourceId: p.id, targetId: ref.id, relationType: '亲子', desc: p.name + '是' + ref.name + '的' + m[2], strength: 0, time: '' });
+              } else if (dir === 'childOf') {
+                relations.push({ sourceId: ref.id, targetId: p.id, relationType: '亲子', desc: ref.name + '的' + m[2] + '：' + p.name, strength: 0, time: '' });
+              } else {
+                relations.push({ sourceId: ref.id, targetId: p.id, relationType: type, desc: ref.name + '与' + p.name + '（' + m[2] + '）', strength: 0, time: '' });
+              }
+              break;
+            }
+          }
+        }
+      }
+      // 紧邻匹配：无”之/的”连接（”主角妹妹” / “布兰登最爱的女孩”等）——仅匹配真实人物名，杜绝垃圾跨度
+      {
+        const escRe = s => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const nameAlts = [];
+        for (const p of persons) {
+          nameAlts.push(escRe(p.name));
+          for (const seg of p.name.split('·')) {
+            if (seg.length >= 2 && seg !== p.name) nameAlts.push(escRe(seg));
+          }
+        }
+        nameAlts.push('女主角', '主角', '玩家角色', '侦探');
+        const uniqAlts = [...new Set(nameAlts)].sort((a, b) => b.length - a.length).filter(a => a.length >= 2);
+        const re2 = new RegExp('(' + uniqAlts.join('|') + ')(?:亡|养|继|前)?(姐姐|妹妹|哥哥|弟弟|父|母|丈夫|妻子|未婚夫|未婚妻|父亲|母亲|女儿|儿子|侄女|侄子|外甥|外甥女|孙子|孙女|祖父|祖母|姑婆)', 'g');
+        for (const p of persons) {
+          if (!p.intro) continue;
+          re2.lastIndex = 0;
+          let m2;
+          while ((m2 = re2.exec(p.intro))) {
+            const refs = resolveKinRefs(m2[1]);
+            if (!refs.length) continue;
+              const kinRe = new RegExp('^' + m2[2] + '$');
+              for (const [kinReR, type, dir] of KIN_RULES) {
+                if (!kinReR.test(m2[2])) continue;
+                for (const ref of refs) {
+                  if (ref.id === p.id || relPushed(ref.id, p.id)) continue;
+                  if (dir === 'parentOf') {
+                    relations.push({ sourceId: p.id, targetId: ref.id, relationType: '亲子', desc: p.name + '是' + ref.name + '的' + m2[2], strength: 0, time: '' });
+                  } else if (dir === 'childOf') {
+                    relations.push({ sourceId: ref.id, targetId: p.id, relationType: '亲子', desc: ref.name + '的' + m2[2] + '：' + p.name, strength: 0, time: '' });
+                  } else {
+                    relations.push({ sourceId: ref.id, targetId: p.id, relationType: type, desc: ref.name + '与' + p.name + '（' + m2[2] + '）', strength: 0, time: '' });
+                  }
+                }
+                break;
+              }
+            }
+          }
+        }
+      // 纯称谓人物（”母亲”/”父亲”）与裸称谓简介（”侄女，父母双亡…”）→ 关联到本篇主角（isPH/protagonist 见上方定义）
+      const isKinOnlyName = (nm) => /^(母亲|父亲|妈妈|爸爸)$/.test(nm);
+      const bareKinRe = /^(?:小)?(高祖父|曾祖父|祖父|祖母|爷爷|奶奶|侄女|侄子|孙子|孙女|妹妹|姐姐|弟弟|哥哥|养女|养子|养兄|养妹|外甥|外甥女|姨妈|姑妈|叔叔|舅舅|伯伯|婶婶|父亲|母亲)\s*[，,、—–-]/;
+      if (protagonistFinal) {
+        for (const p of persons) {
+          if (p === protagonistFinal) continue;
+          if (isKinOnlyName(p.name) && !relPushed(p.id, protagonistFinal.id)) {
+            relations.push({ sourceId: p.id, targetId: protagonistFinal.id, relationType: '亲子', desc: '剧情推断：' + p.name + '与' + protagonistFinal.name + '的家人关系', strength: 0, time: '' });
+          } else if (bareKinRe.test((p.intro || '').trim()) && !relPushed(p.id, protagonistFinal.id)) {
+            const kw = (p.intro.trim().match(bareKinRe))[1];
+            relations.push({ sourceId: protagonistFinal.id, targetId: p.id, relationType: '亲属', desc: '剧情推断：' + protagonistFinal.name + '的' + kw + '——' + p.name, strength: 0, time: '' });
+          } else if (/^[\u4e00-\u9fa5]{0,4}(养子|养女|养兄|养妹)/.test((p.intro || '').trim()) && !relPushed(p.id, protagonistFinal.id)) {
+            relations.push({ sourceId: protagonistFinal.id, targetId: p.id, relationType: '亲属', desc: '剧情推断：' + protagonistFinal.name + '的养亲——' + p.name, strength: 0, time: '' });
+          } else if (p.intro && p.intro.length <= 30 && /的(父亲|母亲|爸爸|妈妈)/.test(p.intro) && !relPushed(p.id, protagonistFinal.id)) {
+            // "以新形态归来的父亲"等：简介前段出现"的父/母"称谓 → 推断为主角父母
+            relations.push({ sourceId: p.id, targetId: protagonistFinal.id, relationType: '亲子', desc: '剧情推断：' + protagonistFinal.name + '的父/母——' + p.name, strength: 0, time: '' });
+          }
+        }
+      }
+    }
+    // 人物简介子句级关系挖掘（"以仪式为名囚禁路易莎"→ 敌对 等，补全恩怨叙述中的关联）
+    {
+      const MINE_RULES = [
+        [/深爱|暗恋|相爱|恋人|定情/, '恋人'],
+        [/未婚夫|未婚妻|成婚|结婚|订婚|丈夫|妻子|夫妻/, '夫妻'],
+        [/囚禁|绑架|掳走|杀害|谋杀|毒死|毒杀|杀死|追杀|袭击|陷害|诅咒|复仇|报复|夺取|夺走|密谋|反派|宿敌|死敌|敌对|操纵|利用|欺骗|蛊惑|教唆|胁迫|虐待|击败|打败|挫败|夺舍|献祭|放逐|驱逐|受害|祭品|控制/, '敌对'],
+        [/协助|帮助|救下|救出|拯救|联手|并肩|同盟|相助|相救|保护|守护|托付|抚养|救赎|宽恕|引导|帮手|立约/, '联手'],
+        [/化身|代理|分身|宿主|同伴/, '关联']
+      ];
+      // 已有关系对集合（避免重复建边）
+      const pairSet = new Set();
+      for (const r of relations) pairSet.add([r.sourceId, r.targetId].sort().join('|'));
+      // 人物候选（长名优先，含别名与"·"分段≥3字；纯称谓别名除外，避免"父亲"等词误匹配）
+      const cands = [];
+      for (const p of persons) {
+        cands.push(p);
+        for (const seg of p.name.split('·')) {
+          if (seg.length >= 3 && seg !== p.name && !/^(母亲|父亲)$/.test(seg)) cands.push({ id: p.id, name: seg, _viaSeg: true });
+        }
+        if ((p.alias || '').length >= 2 && !/^(父亲|母亲|爸爸|妈妈|女儿|儿子|姐妹|兄弟|姐姐|妹妹|哥哥|弟弟)$/.test(p.alias)) {
+          cands.push({ id: p.id, name: p.alias, _viaAlias: true });
+        }
+      }
+      cands.sort((a, b) => b.name.length - a.name.length);
+      for (const p of persons) {
+        if (!p.intro) continue;
+        for (const clause of p.intro.split(/[，。；;！？!?,]/)) {
+          const text = clause.replace(/["“”]/g, '');
+          if (!text || text.length > 80) continue;
+          // 找到子句中的其他人物；最长匹配去重叠、按人物去重，多人时仅保留关键词紧邻者
+          const matches = [];
+          for (const c of cands) {
+            if (c.id === p.id) continue;
+            const idx = text.indexOf(c.name);
+            if (idx >= 0) matches.push({ c, idx, end: idx + c.name.length });
+          }
+          if (!matches.length) continue;
+          matches.sort((a, b) => b.c.name.length - a.c.name.length);
+          const kept = [];
+          for (const m2 of matches) {
+            const overlap = kept.some(k => m2.idx < k.end && k.idx < m2.end);
+            if (!overlap) kept.push(m2);
+          }
+          const seenIds = new Set();
+          const uniq = [];
+          for (const m2 of kept) {
+            if (seenIds.has(m2.c.id)) continue;
+            seenIds.add(m2.c.id);
+            uniq.push(m2);
+          }
+          if (!uniq.length) continue;
+          let targets = [];
+          for (const [re, type] of MINE_RULES) {
+            re.lastIndex = 0;
+            const km = re.exec(text);
+            if (!km) continue;
+            const adjacent = uniq.filter(m3 => Math.abs(m3.idx - km.index) <= 3 + m3.c.name.length);
+            if (adjacent.length) { targets = adjacent.map(a2 => ({ other: a2.c, nameIdx: a2.idx, type })); break; }
+          }
+          if (!targets.length && uniq.length === 1) {
+            // 无命中关键词但唯一人物 → 关联
+            targets = [{ other: uniq[0].c, nameIdx: uniq[0].idx, type: '关联' }];
+          }
+          for (const t of targets) {
+            const pairKey = [p.id, t.other.id].sort().join('|');
+            if (pairSet.has(pairKey)) continue;
+            relations.push({ sourceId: p.id, targetId: t.other.id, relationType: t.type, desc: text.slice(0, 60), strength: 0, time: '' });
+            pairSet.add(pairKey);
+          }
+        }
+      }
+    }
+    // 关系去重（同对人物 + 同类亲属关系合并）
+    const KIN = /^(亲子|父子|父女|母子|母女|养子|养女)$/;
+    const seenRel = new Set();
+    const deduped = [];
+    for (const r of relations) {
+      const pairKey = [r.sourceId, r.targetId].sort().join('|');
+      const normType = r.relationType === '配偶' ? '夫妻' : r.relationType;
+      const key = pairKey + '|' + (KIN.test(normType) ? '亲子' : normType);
+      if (seenRel.has(key)) continue;
+      seenRel.add(key);
+      r.relationType = normType;
+      deduped.push(r);
+    }
+    // 关系强度推断：Markdown 无强度字段，按关系类型分级（至亲>手足>师徒/对立>普通关联），
+    // 描述中的强语气词再 +1，保证导入后的关系线有差异化粗细
+    const DEFAULT_STRENGTH = {
+      夫妻: 9, 恋人: 8, 父子: 9, 父女: 9, 母子: 9, 母女: 9, 亲子: 9,
+      兄弟: 8, 姐妹: 8, 兄妹: 8, 龙凤胎: 9, 双胞胎: 9, 祖孙: 8, 养子: 7, 养兄妹: 7,
+      师徒: 7, 同窗: 6, 君臣: 7, 主仆: 6, 对手: 6, 敌对: 7, 联手: 6, 救赎: 6,
+      亲属: 5, 创造: 6, 依附: 4
+    };
+    const STRONG_TEXT = /宿敌|死敌|世仇|决裂|至爱|深爱|至死不渝|生死之交|莫逆|挚友|恨/;
+    for (const r of deduped) {
+      if (!r.strength) {
+        r.strength = Math.min(10, (DEFAULT_STRENGTH[r.relationType] || 3) + (STRONG_TEXT.test(r.desc || '') ? 1 : 0));
+      }
+    }
+    if (skipped) {
+      const detail = skippedLines.slice(0, 3).map(s2 => `第${s2.no}行"${s2.text}…"`).join('、');
+      infos.push(`${fileName}：${skipped} 行叙述性内容未结构化（${detail}${skipped > 3 ? '等' : ''}）`);
+    }
+    infos.push(`${fileName}：解析出人物 ${persons.length}、关系 ${deduped.length}、时间线事件 ${events.length}`);
+
+    return {
+      persons,
+      relations: deduped.map(r => this._objToRelation(r)),
+      events: events.map(e => this._objToEvent(e)),
+      errors,
+      infos,
+      fileName: fileName || 'Markdown 文档'
+    };
+  },
+
+  _objToEvent(m) {
+    return {
+      id: m.id || '',
+      title: String(m.title || '未命名事件').trim() || '未命名事件',
+      time: String(m.time || '').trim(),
+      order: Number(m.order) || 0,
+      era: String(m.era || '').trim(),
+      desc: String(m.desc || '').trim(),
+      persons: Array.isArray(m.persons) ? m.persons : Utils.parseTags(m.persons || '')
+    };
+  },
+
+  /* 将解析结果应用到画布（返回是否成功） */
+  applyImport(parsed, mode) {
+    GraphStore.pushUndo(mode === 'append' ? '追加导入数据' : '导入数据');
+    if (mode !== 'append') GraphStore.clearContent();
+    let np = 0, nr = 0, ne = 0;
+    for (const p of parsed.persons) { if (GraphStore.addPerson(p, { silent: true })) np++; }
+    for (const r of parsed.relations) { if (GraphStore.addRelation(r, { silent: true })) nr++; }
+    for (const ev of (parsed.events || [])) {
+      const e = GraphStore.normalizeEvent(ev);
+      if (e.title && e.title !== '未命名事件') { GraphStore.addEvent(e, { silent: true }); ne++; }
+    }
+    GraphStore.dirty = true;
+    GraphStore.log(`导入数据：新增人物 ${np} 个，关系 ${nr} 条${ne ? `，事件 ${ne} 条` : ''}（${parsed.fileName}）`);
+    GraphStore.emitChange();
+    return { persons: np, relations: nr, events: ne };
+  },
+
+  /* ============================================================
+     导出
+     ============================================================ */
+
+  /* 渲染关系网到离屏画布
+     倍率策略：优先满足用户倍率，仅当超出「面积预算(36MP) → 单边 12000」时等比降档（保持纵横比），
+     避免超大 canvas 内存溢出；scaled=true 表示实际倍率低于用户选择，用于导出提示 */
+  renderToCanvas(scale, transparent, opts) {
+    if (GraphStore.isEmpty()) { return { error: this.MSG.EMPTY_EXPORT }; }
+    const bbox = Renderer.bboxOfVisible();
+    if (!bbox) return { error: this.MSG.EMPTY_EXPORT };
+    const pad = 40;
+    const rawW = bbox.w + pad * 2, rawH = bbox.h + pad * 2;
+    let s = scale || 1;
+    if (rawW * s * rawH * s > 36e6) s *= Math.sqrt(36e6 / (rawW * rawH * s * s));
+    const maxSide = Math.max(rawW, rawH) * s;
+    if (maxSide > 12000) s *= 12000 / maxSide;
+    const w = Math.ceil(rawW * s), h = Math.ceil(rawH * s);
+    const cv = document.createElement('canvas');
+    cv.width = w; cv.height = h;
+    const ctx = cv.getContext('2d');
+    // 让 bbox 左上角对齐 (pad,pad)
+    const view = { x: pad * s - bbox.x * s, y: pad * s - bbox.y * s, scale: s };
+    Renderer.drawScene(ctx, view, w, h, { transparent, noCull: true, forExport: true, noAvatar: !!(opts && opts.noAvatar) });
+    return { canvas: cv, w, h, scale: s, scaled: s < (scale || 1) - 1e-9 };
+  },
+
+  /* 导出 PNG/JPG：用 toBlob 生成 Blob 后走对象 URL 下载，避免超大 base64 字符串占用内存 */
+  async exportImage(fmt, scale) {
+    let res;
+    try { res = this.renderToCanvas(scale, fmt === 'png-transparent'); }
+    catch (e) { return { error: '导出失败：头像图片跨域受限，请尝试导出其他格式或更换头像来源' }; }
+    if (res.error) return res;
+    const mime = fmt === 'jpg' ? 'image/jpeg' : 'image/png';
+    const ext = fmt === 'jpg' ? 'jpg' : 'png';
+    const toBlob = (cv) => new Promise((resolve, reject) => {
+      try { cv.toBlob(b => b ? resolve(b) : reject(new Error('toBlob 返回空')), mime, 0.95); }
+      catch (e) { reject(e); }
+    });
+    let blob;
+    try { blob = await toBlob(res.canvas); }
+    catch (e) {
+      // 画布被跨域头像污染：去头像重绘（污染画布调用 toBlob 会抛 SecurityError）
+      const res2 = this.renderToCanvas(scale, fmt === 'png-transparent', { noAvatar: true });
+      if (res2.error) return res2;
+      blob = await toBlob(res2.canvas);
+      Utils.emitter.emit('toast', { type: 'warn', text: '部分外链头像因跨域限制未能包含在导出图中' });
+    }
+    if (!blob) return { error: this.MSG.SAVE_FAIL };
+    Utils.download(`${GraphStore.projectName}-人物关系网.${ext}`, blob);
+    GraphStore.log(`导出图片：${ext.toUpperCase()}（${res.w}×${res.h}）`);
+    if (res.scaled) {
+      Utils.emitter.emit('toast', { type: 'info', text: `图幅较大，已按实际 ${res.scale.toFixed(2)}× 导出（原选 ${scale}×）` });
+    }
+    return { ok: true, w: res.w, h: res.h };
+  },
+
+  /* 极简 PDF 生成器：嵌入 JPEG（DCTDecode），无需第三方库 */
+  buildPdfFromCanvas(canvas) {
+    const jpegB64 = canvas.toDataURL('image/jpeg', 0.92).split(',')[1];
+    const jpeg = Utils.b64ToBytes(jpegB64);
+    const wPx = canvas.width, hPx = canvas.height;
+    const w = +(wPx * 0.75).toFixed(2), h = +(hPx * 0.75).toFixed(2);
+
+    const chunks = [];
+    let offset = 0;
+    const offsets = [];
+    const push = (data) => {
+      let bytes;
+      if (typeof data === 'string') {
+        bytes = new Uint8Array(data.length);
+        for (let i = 0; i < data.length; i++) bytes[i] = data.charCodeAt(i) & 0xff;
+      } else bytes = data;
+      chunks.push(bytes); offset += bytes.length;
+    };
+    const beginObj = (n) => { offsets[n] = offset; push(`${n} 0 obj\n`); };
+
+    push('%PDF-1.4\n');
+    beginObj(1); push('<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
+    beginObj(2); push('<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n');
+    beginObj(3); push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${w} ${h}] /Resources << /XObject << /Im1 4 0 R >> /ProcSet [/PDF /ImageC] >> /Contents 5 0 R >>\nendobj\n`);
+    beginObj(4); push(`<< /Type /XObject /Subtype /Image /Width ${wPx} /Height ${hPx} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpeg.length} >>\nstream\n`);
+    push(jpeg); push('\nendstream\nendobj\n');
+    const content = `q ${w} 0 0 ${h} 0 0 cm /Im1 Do Q`;
+    beginObj(5); push(`<< /Length ${content.length} >>\nstream\n${content}\nendstream\nendobj\n`);
+
+    const xrefPos = offset;
+    let xref = 'xref\n0 6\n0000000000 65535 f \n';
+    for (let i = 1; i <= 5; i++) xref += String(offsets[i]).padStart(10, '0') + ' 00000 n \n';
+    xref += `trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xrefPos}\n%%EOF`;
+    push(xref);
+
+    return new Blob(chunks, { type: 'application/pdf' });
+  },
+
+  exportPDF(scale) {
+    let res;
+    try { res = this.renderToCanvas(scale, false); }
+    catch (e) { return { error: '导出失败：头像图片跨域受限，请更换头像来源后重试' }; }
+    if (res.error) return res;
+    const blob = this.buildPdfFromCanvas(res.canvas);
+    Utils.download(`${GraphStore.projectName}-人物关系网.pdf`, blob);
+    GraphStore.log('导出 PDF 文件');
+    return { ok: true };
+  },
+
+  _csvCell(v) {
+    let s = String(v == null ? '' : v);
+    // 防公式注入（CWE-1236）：仅对可能构成公式的形态加 ' 前缀 --
+    // = @ 开头必防；+ - 开头仅在随后跟字母/数字（如 "-2+3"、"-CONCAT(...)"）时防，
+    // 避免误伤"-"（行号占位）这类普通文本
+    if (/^[=@\t\r]/.test(s) || /^[+\-][A-Za-z0-9(]/.test(s)) s = "'" + s;
+    return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  },
+  _csvFromAoa(aoa) {
+    return '\uFEFF' + aoa.map(row => row.map(this._csvCell).join(',')).join('\r\n');
+  },
+
+  /* XLSX 列宽设置（模板 / 数据导出共用，避免 Excel 打开时列宽过窄） */
+  _setColWidths(ws, widths) {
+    ws['!cols'] = widths.map(wch => ({ wch }));
+  },
+
+  exportDataJSON() {
+    const data = {
+      app: 'rgxw-data', version: 2, exportedAt: new Date().toISOString(),
+      persons: GraphStore.persons.map(p => ({
+        '人物ID': p.id, '人物姓名': p.name, '英文名/别名': p.alias || '', '头像': p.avatar, '人物简介': p.intro,
+        '人物标签': (p.tag || []).join('、'), '归属分组': p.group, '性别': p.gender, '年龄': p.age, '身份职位': p.position
+      })),
+      relations: GraphStore.relations.map(r => ({
+        '起始人物ID': r.sourceId, '目标人物ID': r.targetId, '关系类型': r.relationType,
+        '关系描述': r.desc, '关系强度': r.strength, '关系时间': r.time, '备注': r.note
+      })),
+      events: (GraphStore.events || []).map(e => ({
+        '事件名称': e.title, '时间/年代': e.time, '排序序号': e.order, '时期/篇章': e.era,
+        '事件说明': e.desc, '关联人物': (e.persons || []).join('、')
+      }))
+    };
+    Utils.download(`${GraphStore.projectName}-源数据.json`, JSON.stringify(data, null, 2), 'application/json');
+    GraphStore.log('导出源数据 JSON');
+    return { ok: true };
+  },
+
+  _personsAoa() {
+    const pAoa = [['人物ID', '人物姓名', '英文名/别名', '头像URL/本地路径', '人物简介', '人物标签', '性别', '年龄', '身份职位', '归属分组']];
+    for (const p of GraphStore.persons) {
+      pAoa.push([p.id, p.name, p.alias || '', p.avatar, p.intro, (p.tag || []).join('、'), p.gender, p.age, p.position, p.group]);
+    }
+    return pAoa;
+  },
+  _relationsAoa() {
+    const rAoa = [['起始人物ID', '目标人物ID', '关系类型', '关系描述', '关系强度', '关系时间', '备注']];
+    for (const r of GraphStore.relations) {
+      rAoa.push([r.sourceId, r.targetId, r.relationType, r.desc, r.strength, r.time, r.note]);
+    }
+    return rAoa;
+  },
+  _eventsAoa() {
+    const eAoa = [['事件名称', '时间/年代', '排序序号', '时期/篇章', '事件说明', '关联人物']];
+    for (const e of (GraphStore.events || [])) {
+      eAoa.push([e.title, e.time, e.order, e.era, e.desc, (e.persons || []).join('、')]);
+    }
+    return eAoa;
+  },
+  exportDataCSV() {
+    if (GraphStore.isEmpty()) return { error: this.MSG.EMPTY_EXPORT };
+    Utils.download('人物信息表.csv', this._csvFromAoa(this._personsAoa()), 'text/csv');
+    setTimeout(() => Utils.download('关系信息表.csv', this._csvFromAoa(this._relationsAoa()), 'text/csv'), 350);
+    if ((GraphStore.events || []).length) {
+      setTimeout(() => Utils.download('时间线事件表.csv', this._csvFromAoa(this._eventsAoa()), 'text/csv'), 700);
+    }
+    GraphStore.log('导出源数据 CSV');
+    return { ok: true };
+  },
+  exportDataXLSX() {
+    if (GraphStore.isEmpty()) return { error: this.MSG.EMPTY_EXPORT };
+    const wb = XLSX.utils.book_new();
+    const pWs = XLSX.utils.aoa_to_sheet(this._personsAoa());
+    this._setColWidths(pWs, [10, 12, 14, 18, 32, 16, 6, 6, 12, 12]);
+    XLSX.utils.book_append_sheet(wb, pWs, '人物信息表');
+    const rWs = XLSX.utils.aoa_to_sheet(this._relationsAoa());
+    this._setColWidths(rWs, [12, 12, 10, 30, 8, 12, 16]);
+    XLSX.utils.book_append_sheet(wb, rWs, '关系信息表');
+    if ((GraphStore.events || []).length) {
+      const eWs = XLSX.utils.aoa_to_sheet(this._eventsAoa());
+      this._setColWidths(eWs, [18, 14, 8, 12, 32, 20]);
+      XLSX.utils.book_append_sheet(wb, eWs, '时间线事件表');
+    }
+    try { XLSX.writeFile(wb, `${GraphStore.projectName}-源数据.xlsx`); }
+    catch (e) { return { error: this.MSG.SAVE_FAIL }; }
+    GraphStore.log('导出源数据 Excel');
+    return { ok: true };
+  },
+
+  /* ---------- 标准导入模板下载（3.1.1，含时间线事件表） ---------- */
+  downloadTemplate(kind) {
+    const pHead = ['人物ID', '人物姓名', '英文名/别名', '头像URL/本地路径', '人物简介', '人物标签', '性别', '年龄', '身份职位', '归属分组'];
+    const pRow1 = ['P001', '张三', 'John Smith', '', '示例人物简介', '主角、队长', '男', '28', '队长', '红队'];
+    const pRow2 = ['P002', '李四', 'Lee', '', '示例人物简介', '成员', '女', '25', '分析员', '蓝队'];
+    const rHead = ['起始人物ID', '目标人物ID', '关系类型', '关系描述', '关系强度', '关系时间', '备注'];
+    const rRow1 = ['P001', 'P002', '同事', '示例关系描述', '8', '2024-01', '强度1-10'];
+    const rRow2 = ['P002', 'P001', '好友', '示例关系描述', '6', '2023-06', ''];
+    const eHead = ['事件名称', '时间/年代', '排序序号', '时期/篇章', '事件说明', '关联人物'];
+    const eRow1 = ['家族迁入古堡', '当代', '1', '第一章', '布兰登一家搬入格雷古堡后怪事频发', '张三、李四'];
+    const eRow2 = ['地牢仪式败露', '当代', '2', '第二章', '地牢中黑魔法仪式正在进行', '张三'];
+
+    if (kind === 'xlsx') {
+      const wb = XLSX.utils.book_new();
+      const pWs = XLSX.utils.aoa_to_sheet([pHead, pRow1, pRow2]);
+      this._setColWidths(pWs, [10, 12, 14, 18, 32, 16, 6, 6, 12, 12]);
+      const rWs = XLSX.utils.aoa_to_sheet([rHead, rRow1, rRow2]);
+      this._setColWidths(rWs, [12, 12, 10, 30, 8, 12, 16]);
+      const eWs = XLSX.utils.aoa_to_sheet([eHead, eRow1, eRow2]);
+      this._setColWidths(eWs, [18, 14, 8, 12, 32, 20]);
+      XLSX.utils.book_append_sheet(wb, pWs, '人物信息表');
+      XLSX.utils.book_append_sheet(wb, rWs, '关系信息表');
+      XLSX.utils.book_append_sheet(wb, eWs, '时间线事件表');
+      XLSX.writeFile(wb, '人物关系网-标准导入模板.xlsx');
+    } else if (kind === 'csv') {
+      Utils.download('人物信息表.csv', this._csvFromAoa([pHead, pRow1, pRow2]), 'text/csv');
+      setTimeout(() => Utils.download('关系信息表.csv', this._csvFromAoa([rHead, rRow1, rRow2]), 'text/csv'), 350);
+      setTimeout(() => Utils.download('时间线事件表.csv', this._csvFromAoa([eHead, eRow1, eRow2]), 'text/csv'), 700);
+    } else {
+      const tpl = {
+        persons: [{ '人物ID': 'P001', '人物姓名': '张三', '英文名/别名': 'John Smith', '头像': '', '人物简介': '示例人物简介', '人物标签': '主角、队长', '性别': '男', '年龄': '28', '身份职位': '队长', '归属分组': '红队' },
+                  { '人物ID': 'P002', '人物姓名': '李四', '英文名/别名': 'Lee', '头像': '', '人物简介': '示例人物简介', '人物标签': '成员', '性别': '女', '年龄': '25', '身份职位': '分析员', '归属分组': '蓝队' }],
+        relations: [{ '起始人物ID': 'P001', '目标人物ID': 'P002', '关系类型': '同事', '关系描述': '示例关系描述', '关系强度': 8, '关系时间': '2024-01', '备注': '强度1-10' }],
+        events: [{ '事件名称': '家族迁入古堡', '时间/年代': '当代', '排序序号': 1, '时期/篇章': '第一章', '事件说明': '布兰登一家搬入古堡', '关联人物': '张三、李四' }]
+      };
+      Utils.download('人物关系网-标准导入模板.json', JSON.stringify(tpl, null, 2), 'application/json');
+    }
+    return { ok: true };
+  },
+
+  /* ============================================================
+     工程文件（.rgxw / .rgxw.json，支持自定义密码加密）
+     ============================================================ */
+  buildProjectData() {
+    return {
+      app: 'rgxw', version: 2, name: GraphStore.projectName,
+      savedAt: new Date().toISOString(),
+      theme: App.currentTheme,
+      options: Utils.deepClone(Renderer.options),
+      view: Utils.deepClone(Renderer.view),
+      persons: JSON.parse(JSON.stringify(GraphStore.persons)),
+      relations: JSON.parse(JSON.stringify(GraphStore.relations)),
+      events: JSON.parse(JSON.stringify(GraphStore.events || [])),
+      log: GraphStore.logEntries.slice(0, 100)
+    };
+  },
+
+  async encryptProject(obj, password) {
+    if (!window.crypto || !crypto.subtle) throw new Error('当前浏览器不支持加密，请改用不带密码保存');
+    const enc = new TextEncoder();
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const keyMat = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
+    const key = await crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt, iterations: 120000, hash: 'SHA-256' }, keyMat,
+      { name: 'AES-GCM', length: 256 }, false, ['encrypt']);
+    const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(JSON.stringify(obj)));
+    return {
+      app: 'rgxw-encrypted', v: 1, hint: '该工程文件已加密，打开需输入密码',
+      salt: Utils.bytesToB64(salt), iv: Utils.bytesToB64(iv), data: Utils.bytesToB64(new Uint8Array(ct))
+    };
+  },
+
+  async decryptProject(obj, password) {
+    const enc = new TextEncoder(), dec = new TextDecoder();
+    const salt = Utils.b64ToBytes(obj.salt), iv = Utils.b64ToBytes(obj.iv);
+    const keyMat = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
+    const key = await crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt, iterations: 120000, hash: 'SHA-256' }, keyMat,
+      { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+    const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, Utils.b64ToBytes(obj.data));
+    return JSON.parse(dec.decode(plain));
+  },
+
+  /* 读取工程文件（自动识别加密），password 可选 */
+  async readProjectFile(file, password) {
+    let text;
+    try { text = await file.text(); } catch (e) { throw new Error(this.MSG.PROJECT_BROKEN); }
+    let obj;
+    try { obj = JSON.parse(text); } catch (e) { throw new Error(this.MSG.PROJECT_BROKEN); }
+    if (obj && obj.app === 'rgxw-encrypted') {
+      if (!password) { const err = new Error('NEED_PASSWORD'); err.needPassword = true; err.encryptedObj = obj; throw err; }
+      try { obj = await this.decryptProject(obj, password); }
+      catch (e) { const err = new Error('WRONG_PASSWORD'); err.wrongPassword = true; throw err; }
+    }
+    if (!obj || (obj.app !== 'rgxw' && obj.app !== 'rgxw-data')) throw new Error(this.MSG.PROJECT_BROKEN);
+    return obj;
+  },
+
+  /* 将工程数据应用到画布 */
+  applyProject(obj) {
+    GraphStore.pushUndo('打开工程');
+    GraphStore.clearContent();
+    GraphStore.projectName = obj.name || '未命名工程';
+    const persons = (obj.persons || obj['人物'] || []).map(p => GraphStore.normalizePerson(p));
+    const relations = (obj.relations || obj['关系'] || []).map(r => GraphStore.normalizeRelation(r));
+    const events = (obj.events || obj['事件'] || []).map(e => GraphStore.normalizeEvent(e));
+    GraphStore.persons = persons;
+    GraphStore.relations = relations;
+    GraphStore.events = events;
+    GraphStore.reindex();
+    // 字段白名单 + 数值校验：防工程文件中的非法值（含 __proto__ 键）污染全局配置
+    if (obj.options && typeof obj.options === 'object' && !Array.isArray(obj.options)) {
+      const o = obj.options, d = Renderer.options;
+      const num = (v, def, min, max) => { const n = Number(v); return Number.isFinite(n) ? Utils.clamp(n, min, max) : def; };
+      Renderer.options = {
+        nodeSize: num(o.nodeSize, d.nodeSize, 14, 60),
+        labelSize: num(o.labelSize, d.labelSize, 10, 20),
+        curvature: num(o.curvature, d.curvature, 0, 0.5),
+        showArrow: !!o.showArrow,
+        showEdgeLabels: !!o.showEdgeLabels,
+        edgeWidthMul: num(o.edgeWidthMul, d.edgeWidthMul, 0.5, 3),
+        colorByGroup: o.colorByGroup !== false
+      };
+    }
+    if (obj.view && Number.isFinite(Number(obj.view.scale)) && Number(obj.view.scale) > 0) {
+      const vx = Number(obj.view.x), vy = Number(obj.view.y), vs = Number(obj.view.scale);
+      Renderer.view = {
+        x: Number.isFinite(vx) ? vx : Renderer.view.x,
+        y: Number.isFinite(vy) ? vy : Renderer.view.y,
+        scale: Utils.clamp(vs, Renderer.FIT_MIN, Renderer.MAX_ZOOM)
+      };
+    }
+    GraphStore.logEntries = Array.isArray(obj.log) ? obj.log : [];
+    GraphStore.dirty = false;
+    GraphStore.log(`打开工程：${GraphStore.projectName}`);
+    GraphStore.emitChange();
+    return { theme: obj.theme || 'light' };
+  }
+};

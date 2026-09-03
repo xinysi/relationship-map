@@ -1,0 +1,11 @@
+# 依赖与构建产物
+node_modules/
+__pycache__/
+*.pyc
+
+# 本地生成物（PPT 演示产物、临时输出）
+output/
+
+# 系统文件
+.DS_Store
+Thumbs.db

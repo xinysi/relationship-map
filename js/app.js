@@ -1904,10 +1904,10 @@ const App = {
       const items = entries.filter(([id, t]) => (t.group || 'classic') === gid);
       if (!items.length) return '';
       return `<div class="theme-group"><div class="theme-group-title">${gname}</div>
-        <div class="theme-grid">${items.map(([id, t]) => cardHTML(id, t)).join('')}</div></div>`;
+        <div class="theme-grid wide">${items.map(([id, t]) => cardHTML(id, t)).join('')}</div></div>`;
     }).join('');
     const names = Object.fromEntries(entries);
-    const m = this.openModal({ title: '主题切换', bodyHTML });
+    const m = this.openModal({ title: '主题切换', width: 860, bodyHTML });
     m.body.querySelectorAll('.theme-card').forEach(card => {
       card.onclick = () => {
         this.currentTheme = card.dataset.theme;

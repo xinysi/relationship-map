@@ -467,6 +467,7 @@ const App = {
     GraphStore.projectName = SampleData.name;
     for (const p of SampleData.persons) GraphStore.addPerson(p, { silent: true });
     for (const r of SampleData.relations) GraphStore.addRelation(r, { silent: true });
+    for (const e of (SampleData.events || [])) GraphStore.addEvent(e, { silent: true });
     GraphStore.dirty = true;
     GraphStore.log('加载内置示例数据（长夜档案）');
     GraphStore.emitChange();

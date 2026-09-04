@@ -687,6 +687,28 @@ const App = {
         return;
       }
 
+      // 折叠视图：悬浮显示社区信息，不弹人物浮窗（人物原坐标已被超节点占据）
+      if (Renderer.foldState.on && GraphStore.persons.length >= 20) {
+        const fm = Renderer.foldHitAt(p.x, p.y);
+        if (fm) {
+          const d2 = Renderer.ensureFoldData();
+          const names = (d2.groups[fm.idx] || []).slice(0, 3).map(x => x.name).join('、');
+          tooltip.innerHTML = '<div class="tt-name">' + Utils.escapeHtml(fm.name || '') + '</div>' +
+            '<div class="tt-group">' + fm.size + ' ' + I18n.tr('人') + (names ? ' · ' + Utils.escapeHtml(names) + '…' : '') + '</div>' +
+            '<div class="tt-sub">' + I18n.tr('点击查看全部成员') + '</div>';
+          this.placeTooltip(p, tooltip);
+          canvas.style.cursor = 'pointer';
+        } else {
+          hideTooltip();
+          canvas.style.cursor = 'default';
+        }
+        Renderer.hoverPersonId = null;
+        Renderer.hoverEdgeId = null;
+        Renderer.requestDraw();
+        lastX = p.x; lastY = p.y;
+        return;
+      }
+
       // 悬浮检测
       lastX = p.x; lastY = p.y;
       const node = Renderer.pickNode(p.x, p.y);

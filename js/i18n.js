@@ -638,6 +638,7 @@ const I18n = {
       'Markdown 剧情模板已下载': 'Markdown template downloaded',
       '社区折叠视图': 'Fold Communities',
       '社区成员': 'Community Members',
+      '点击查看全部成员': 'Click to view all members',
       '至少需要 20 个人物才能使用社区折叠视图': 'Fold view needs at least 20 persons',
       '自定义': 'Custom',
       '导出当前主题': 'Export Current Theme',

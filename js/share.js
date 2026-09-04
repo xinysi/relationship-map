@@ -42,8 +42,8 @@ const SharePage = {
   html,body{margin:0;height:100%;overflow:hidden;font-family:"Microsoft YaHei","PingFang SC","Segoe UI",sans-serif;font-size:13px;color:#2b3445;background:#f0f2f6}
   #cv{position:absolute;inset:0;width:100%;height:100%}
   #top{position:fixed;top:0;left:0;right:0;z-index:5;display:flex;align-items:center;gap:12px;padding:10px 16px;background:rgba(255,255,255,.88);backdrop-filter:blur(6px);border-bottom:1px solid #e2e8f0;pointer-events:none}
-  #top b{font-size:15px}
-  #top span{color:#7a8699}
+  #top b{font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:42vw;flex:none}
+  #top span{color:#7a8699;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:none}
   #hint{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);z-index:5;background:rgba(255,255,255,.85);border:1px solid #e2e8f0;border-radius:14px;padding:6px 14px;color:#7a8699;pointer-events:none}
   #tooltip{position:fixed;z-index:6;max-width:280px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;box-shadow:0 6px 24px rgba(30,40,60,.12);padding:10px 12px;display:none;pointer-events:none}
   #tooltip .n{font-weight:600;font-size:14px}
@@ -57,8 +57,8 @@ const SharePage = {
   #tl .ev .t{font-weight:600}
   #tl .ev .m{color:#7a8699;font-size:11px;margin-top:1px}
   #tlToggle{position:fixed;right:12px;top:56px;z-index:7;background:rgba(255,255,255,.92);border:1px solid #e2e8f0;border-radius:6px;padding:4px 10px;cursor:pointer;color:#2b3445}
-  #legend{position:fixed;left:14px;top:52px;z-index:6;background:rgba(255,255,255,.9);border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;max-width:180px}
-  #legend .lr{display:flex;align-items:center;gap:6px;font-size:11px;color:#4a5568;margin:2px 0}
+  #legend{position:fixed;left:14px;top:52px;z-index:6;background:rgba(255,255,255,.9);border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;max-width:200px;max-height:calc(100% - 100px);overflow-y:auto;overflow-x:hidden}
+  #legend .lr{display:flex;align-items:center;gap:6px;font-size:11px;color:#4a5568;margin:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   #legend .dot{width:10px;height:10px;border-radius:50%;flex:none}
 </style>
 </head>
@@ -131,7 +131,7 @@ var SHARE_DATA = /*__DATA__*/;
       ctx.fillText((p.name||'?').charAt(0),X,Y+1);
       ctx.globalAlpha=dim?th:1;
       ctx.font='13px "Microsoft YaHei",sans-serif';ctx.textBaseline='top';
-      ctx.fillStyle='#2b3445';ctx.fillText(p.name||'未命名',X,Y+r+4);
+      if(view.scale>=0.6||n<=50||pin===p.id||hover===p.id||(relSet&&relSet.has(p.id))||(hl&&hl.has(p.id))){ctx.fillStyle='#2b3445';ctx.fillText(p.name||'未命名',X,Y+r+4)}
     });
     ctx.globalAlpha=1;
     document.getElementById('stat').textContent=n+' 人 · '+D.relations.length+' 关系';

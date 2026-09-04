@@ -1626,6 +1626,7 @@ const App = {
   openTemplateModal() {
     const m = this.openModal({
       title: '下载标准导入模板',
+      width: 580,
       bodyHTML: `
         <div style="line-height:1.8;font-size:13px">
           模板包含「人物信息表」「关系信息表」「时间线事件表」三张表单：<br>

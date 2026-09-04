@@ -70,9 +70,10 @@ const App = {
       el.style.setProperty('background', th.bg || v('--panel') || '', 'important');
       el.style.setProperty('color', th.nodeText || v('--text') || '', 'important');
       el.style.setProperty('box-shadow', '0 6px 24px rgba(0,0,0,.35)', 'important');
+      // 边框同样主题化：成功/普通用主题主色，警告用主题强调色；
+      // 仅错误保留红色（最高语义级，任何主题下警示含义不变）
       const accent = type === 'error' ? (v('--err') || '#e5484d')
-        : type === 'warn' ? (v('--warn') || '#f59f24')
-        : type === 'success' ? (v('--ok') || '#22a06b')
+        : type === 'warn' ? (th.search || v('--warn') || '#f59f24')
         : (th.primary || v('--primary') || '');
       el.style.setProperty('border-left-color', accent, 'important');
     };

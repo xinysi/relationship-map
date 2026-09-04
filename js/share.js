@@ -28,10 +28,12 @@ const SharePage = {
     };
     // 关键：JSON 内嵌 <script> 前用 \u003c 转义，杜绝 </script> 注入
     const json = JSON.stringify(data).replace(/</g, '\\u003c');
-    return this._template().replace('/*__DATA__*/', json);
+    const lang = (typeof I18n !== 'undefined' && I18n.lang === 'en') ? 'en' : 'zh';
+    return this._template(lang).replace('/*__DATA__*/', json);
   },
 
-  _template() {
+  _template(lang) {
+    const EN = lang === 'en';
     return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -64,8 +66,8 @@ const SharePage = {
 </head>
 <body>
 <canvas id="cv"></canvas>
-<div id="top"><b>${this._escapeHtml(GraphStore.projectName)}</b><span>只读分享 · 人物关系网</span><span id="stat"></span></div>
-<div id="hint">拖拽平移 · 滚轮缩放 · 悬浮查看信息 · 点击人物固定聚焦（再点或 ESC 恢复）</div>
+<div id="top"><b>${this._escapeHtml(GraphStore.projectName)}</b><span>${EN ? 'Read-only shared · Relationship Web' : '只读分享 · 人物关系网'}</span><span id="stat"></span></div>
+<div id="hint">${EN ? 'Drag to pan · Scroll to zoom · Hover for info · Click to pin (click again or ESC to restore)' : '拖拽平移 · 滚轮缩放 · 悬浮查看信息 · 点击人物固定聚焦（再点或 ESC 恢复）'}</div>
 <div id="tooltip"></div>
 <div id="legend"></div>
 <button id="tlToggle">☰ 时间轴</button>
@@ -134,12 +136,12 @@ var SHARE_DATA = /*__DATA__*/;
       if(view.scale>=0.6||n<=50||pin===p.id||hover===p.id||(relSet&&relSet.has(p.id))||(hl&&hl.has(p.id))){ctx.fillStyle='#2b3445';ctx.fillText(p.name||'未命名',X,Y+r+4)}
     });
     ctx.globalAlpha=1;
-    document.getElementById('stat').textContent=n+' 人 · '+D.relations.length+' 关系';
+    document.getElementById('stat').textContent=n+(EN?' persons · ':' 人 · ')+D.relations.length+(EN?' relations':' 关系');
   }
   /* 悬浮信息 */
   var tip=document.getElementById('tooltip');
   function showTip(p){tip.style.display='block';tip.innerHTML='<div class="n">'+esc(p.name)+'</div>'+(p.group?'<div class="g">'+esc(p.group)+(p.position?' · '+esc(p.position):'')+'</div>':'')+(p.intro?'<div class="i">'+esc(p.intro.slice(0,120))+'</div>':'')+countRel(p.id)}
-  function countRel(id){var c=0,names=[];D.relations.forEach(function(r){var o=null;if(r.sourceId===id)o=r.targetId;else if(r.targetId===id)o=r.sourceId;if(o){c++;if(names.length<3)names.push((byId[o]?byId[o].name:o))}});if(!c)return'';return'<div class="g" style="margin-top:4px">关联 '+c+' 条</div>'}
+  function countRel(id){var c=0,names=[];D.relations.forEach(function(r){var o=null;if(r.sourceId===id)o=r.targetId;else if(r.targetId===id)o=r.sourceId;if(o){c++;if(names.length<3)names.push((byId[o]?byId[o].name:o))}});if(!c)return'';return'<div class="g" style="margin-top:4px">'+(EN?'Related '+c: '关联 '+c+' 条')+'</div>'}
   function hideTip(){tip.style.display='none'}
   function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
   function pick(sx,sy){var wx=(sx-view.x)/view.scale,wy=(sy-view.y)/view.scale;for(var i=D.persons.length-1;i>=0;i--){var p=D.persons[i],dx=wx-p.x,dy=wy-p.y;if(dx*dx+dy*dy<=(R+4/view.scale)*(R+4/view.scale))return p}return null}
@@ -160,7 +162,7 @@ var SHARE_DATA = /*__DATA__*/;
   /* 时间轴 */
   var tl=document.getElementById('tl'),eraOrder=[];
   D.events.forEach(function(ev){if(eraOrder.indexOf(ev.era)<0)eraOrder.push(ev.era)});
-  function renderTl(){var html='';eraOrder.forEach(function(era){var es=D.events.filter(function(e){return e.era===era});html+='<div class="h">'+esc(era||'未分类')+'</div>';es.forEach(function(ev){html+='<div class="ev" data-t="'+esc(ev.title)+'"><div class="t">'+esc(ev.title)+'</div>'+(ev.time?'<div class="m">'+esc(ev.time)+'</div>':'')+'</div>'})});tl.innerHTML=html||'<div class="m">暂无时间线事件</div>'}
+  function renderTl(){var html='';eraOrder.forEach(function(era){var es=D.events.filter(function(e){return e.era===era});html+='<div class="h">'+esc(era||(EN?'Uncategorized':'未分类'))+'</div>';es.forEach(function(ev){html+='<div class="ev" data-t="'+esc(ev.title)+'"><div class="t">'+esc(ev.title)+'</div>'+(ev.time?'<div class="m">'+esc(ev.time)+'</div>':'')+'</div>'})});tl.innerHTML=html||'<div class="m">'+(EN?'No timeline events yet':'暂无时间线事件')+'</div>'}
   renderTl();
   tl.addEventListener('click',function(e){var el=e.target.closest('.ev');if(!el)return;var t=el.dataset.t;var ev=D.events.filter(function(x){return x.title===t})[0];if(!ev)return;
     var ids=[];ev.persons.forEach(function(nm){var p=null;for(var k in byId)if(byId[k].name===nm){p=byId[k];break}if(p)ids.push(p.id)});

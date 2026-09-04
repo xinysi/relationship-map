@@ -468,7 +468,7 @@ const App = {
     for (const p of SampleData.persons) GraphStore.addPerson(p, { silent: true });
     for (const r of SampleData.relations) GraphStore.addRelation(r, { silent: true });
     GraphStore.dirty = true;
-    GraphStore.log('加载内置示例数据（三国人物关系）');
+    GraphStore.log('加载内置示例数据（长夜档案）');
     GraphStore.emitChange();
     await this.relayout('force', true);
     this.toast('示例数据加载完成，可自由拖拽、缩放、编辑体验', 'success');

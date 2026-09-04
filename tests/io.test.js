@@ -26,6 +26,39 @@ test('parseCSVText：引号/转义/分隔符', () => {
   assert.deepEqual(Array.from(rows[1]), ['x,y', 'z', 'q"q']);
 });
 
+test('Markdown 叙述句式：与/和关系词 + 动词句式抽取', () => {
+  const md = '# 角色\n法帅与安娜是恋人\n安多恩格雅杀死了格里格\n格里格与安娜互为仇人\n玛丽和露西是同窗\n';
+  const parsed = DataIO.parseMarkdown(md, '叙述.md');
+  const names = parsed.persons.map(p => p.name);
+  for (const n of ['法帅', '安娜', '安多恩格雅', '格里格', '玛丽', '露西']) {
+    assert.ok(names.includes(n), `应识别人物 ${n}`);
+  }
+  const rels = parsed.relations;
+  const has = (a, b, t) => rels.some(r => {
+    const sa = parsed.persons.find(p => p.id === r.sourceId)?.name || '';
+    const ta = parsed.persons.find(p => p.id === r.targetId)?.name || '';
+    return ((sa === a && ta === b) || (sa === b && ta === a)) && r.relationType === t;
+  });
+  assert.ok(has('法帅', '安娜', '恋人'), '法帅与安娜 → 恋人');
+  assert.ok(has('安多恩格雅', '格里格', '敌对'), '杀死 → 敌对');
+  assert.ok(has('格里格', '安娜', '仇人'), '互为仇人 → 仇人');
+  assert.ok(has('玛丽', '露西', '同窗'), '同窗 → 同窗');
+  const ids = new Set(parsed.persons.map(p => p.id));
+  assert.ok(parsed.relations.every(r => ids.has(r.sourceId) && ids.has(r.targetId)), '无孤儿关系');
+});
+
+test('Markdown 叙述句式：已有模板人物时仅熟人匹配，不误建新人物', () => {
+  const md = '# 故事\n李胜与王芳是好友\n马凯与郑雪是朋友\n';
+  const parsed = DataIO.parseMarkdown(md, '叙述2.md');
+  // 纯叙述无模板但句式明确：也应解析出人物与关系
+  assert.ok(parsed.persons.length >= 3, `人物数 ${parsed.persons.length}`);
+  assert.ok(parsed.relations.length >= 2, `关系数 ${parsed.relations.length}`);
+  // 不含指代词等噪声行（他/她 非人名，不得误建关系）
+  const md2 = '他与她是恋人\n这人去那家\n';
+  const parsed2 = DataIO.parseMarkdown(md2, '叙述3.md');
+  assert.equal(parsed2.relations.length, 0, '指代词行不误建关系');
+});
+
 test('Markdown fixture 解析：人物/关系/事件与强度推断', async () => {
   const parsed = await DataIO.parseFiles([mdFile()], { mode: 'replace' }, () => {});
   // 阿尔法、贝塔、伽马、梅太太 等

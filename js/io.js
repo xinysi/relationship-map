@@ -1409,6 +1409,73 @@ const DataIO = {
         r.strength = Math.min(10, (DEFAULT_STRENGTH[r.relationType] || 3) + (STRONG_TEXT.test(r.desc || '') ? 1 : 0));
       }
     }
+    /* ---- 叙述句式关系抽取：模板未覆盖的自然语句（如「A与B是恋人」「A杀死了B」） ---- */
+    const narrExtract = (list) => {
+      const STOP_WORDS = /^(他|她|它|我|咱|你|我们|你们|他们|她们|它们|两人|二人|众人|双方|彼此|一人|大家|谁|其|自己|本人|对方|各自|某|那人|此人|之中|其后|此时|那时|事后|原来|最后|随后|不久|最终)$/;
+      const knownNames = new Set();
+      for (const p of persons) {
+        knownNames.add(p.name);
+        if (p.alias) p.alias.split(/[、,，/／]/).forEach(a => { const t = a.trim(); if (t) knownNames.add(t); });
+      }
+      const relWordList = ['死对头', '未婚夫妻', '双胞胎', '龙凤胎', '养兄妹', '恋人', '挚友', '好友', '兄弟', '姐妹', '兄妹', '姐弟', '母子', '父子', '母女', '父女', '师徒', '师生', '朋友', '仇人', '敌人', '对手', '主仆', '君臣', '同窗', '同学', '同事', '搭档', '盟友', '结拜', '亲戚', '亲属', '闺蜜', '祖孙', '养子', '夫妻'];
+      const verb2type = {
+        杀害: '敌对', 杀死: '敌对', 谋杀: '敌对', 暗杀: '敌对', 毒害: '敌对', 毒杀: '敌对', 刺杀: '敌对',
+        背叛: '敌对', 欺骗: '敌对', 抛弃: '敌对', 出卖: '敌对', 诬陷: '敌对', 暗算: '敌对', 陷害: '敌对',
+        绑架: '敌对', 囚禁: '敌对', 驱逐: '敌对', 袭击: '敌对', 举报: '敌对', 报仇: '敌对', 复仇: '敌对',
+        救下: '救赎', 拯救: '救赎', 救活: '救赎', 救治: '救赎', 宽恕: '救赎', 治愈: '救赎', 解救: '救赎',
+        爱上: '恋人', 爱着: '恋人', 暗恋: '恋人', 追求: '恋人', 爱慕: '恋人', 相爱: '恋人',
+        迎娶: '夫妻', 娶了: '夫妻', 嫁给: '夫妻', 成婚: '夫妻', 结婚: '夫妻', 订婚: '夫妻',
+        收养: '养子', 收留: '养子', 抚养: '养子', 收为: '养子', 认作: '养子',
+        拜入: '师徒', 拜师: '师徒', 拜为: '师徒', 师从: '师徒', 教授: '师徒', 教导: '师徒', 收徒: '师徒',
+        效忠: '主仆', 忠于: '主仆', 跟随: '主仆', 侍奉: '主仆', 辅佐: '主仆', 护卫: '主仆',
+        协助: '联手', 相助: '联手', 合作: '联手', 结盟: '联手', 并肩: '联手', 支持: '联手', 营救: '联手',
+        结识: '同窗', 初遇: '同窗', 邂逅: '同窗'
+      };
+      const verbs = Object.keys(verb2type).sort((a, b) => b.length - a.length);
+      const cleanN = (s2) => stripMetaParens(cleanText(s2)).replace(/[“”"「」『』]/g, '').trim();
+      const checkName = (n2) => {
+        n2 = cleanN(n2);
+        if (!n2 || n2.length < 2 || n2.length > 10) return null;
+        if (STOP_WORDS.test(n2) || GENERIC_NAME.test(n2)) return null;
+        if (/^(你|我|他|她|它|这|那|其|彼|谁|某|一|两|三|各|每|本|该|此)/.test(n2) && n2.length <= 3) return null;
+        return n2;
+      };
+      const getByName = (n2, strict) => {
+        const c = cleanN(n2);
+        if (knownNames.has(c)) return findOrCreate(c, {});
+        if (strict) return null;
+        const ok = checkName(c);
+        return ok ? findOrCreate(ok, {}) : null;
+      };
+      const addNarr = (xRaw, yRaw, type, strict) => {
+        const a = getByName(xRaw, strict), b = getByName(yRaw, strict);
+        if (!a || !b || a.id === b.id) return;
+        const key = [a.id, b.id].sort().join('|') + '|' + type;
+        if (list.some(r => r.sourceId !== r.targetId && [r.sourceId, r.targetId].sort().join('|') + '|' + r.relationType === key)) return;
+        list.push({ sourceId: a.id, targetId: b.id, relationType: type, desc: cleanN(xRaw) + '与' + cleanN(yRaw), strength: 0, time: '' });
+      };
+      // 已有模板人物时严格匹配熟人名；纯叙述文档（无人物表）才启用启发式建人，降低误报
+      const strict = knownNames.size > 0;
+      const relRe = new RegExp('^([^\\s，,。；;！!？?：:]{1,16}?)(?:与|和|跟|同)([^\\s，,。；;！!？?：:]{1,16}?)(?:是|为|皆为|互为|成了|成为|结为|结成|是一对)?(' + relWordList.join('|') + ')(?:关系|一对|两家)?(?:[。；;！!？?，,]|$)');
+      const verbRe = new RegExp('^([^\\s，,。；;！!？?：:]{1,16}?)(?:' + verbs.map(v => v + '(?:了)?').join('|') + ')([^\\s，,。；;！!？?：:]{1,16}?)(?:[。；;！!？?，,]|$)');
+      let codeOn = false;
+      for (const rawLine of lines) {
+        const line = stripMd(rawLine).trim();
+        if (/^```/.test(line)) { codeOn = !codeOn; continue; }
+        if (codeOn || !line || line.length > 60) continue;
+        if (/^[#|>!*\-]|^[0-9]+[.、]/.test(line)) continue;
+        let m = relRe.exec(line);
+        if (m) { addNarr(m[1], m[2], m[3], strict); continue; }
+        const m2 = verbRe.exec(line);
+        if (m2) {
+          const seg = line.slice(m2[1].length);
+          const v = verbs.find(vv => seg.indexOf(vv) === 0);
+          if (v) addNarr(m2[1], m2[2], verb2type[v], strict);
+        }
+      }
+    };
+    narrExtract(deduped);
+
     if (skipped) {
       const detail = skippedLines.slice(0, 3).map(s2 => `第${s2.no}行"${s2.text}…"`).join('、');
       infos.push(`${fileName}：${skipped} 行叙述性内容未结构化（${detail}${skipped > 3 ? '等' : ''}）`);

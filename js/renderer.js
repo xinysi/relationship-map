@@ -79,23 +79,47 @@ const Renderer = {
     matcha:   { name: '抹茶', group: 'nature', bg: '#f4f5ea', dot: '#e0e4c8', nodeFill: '#ffffff', nodeBorder: '#8a9a2e', nodeText: '#38402e', subText: '#84906e', edge: '#cdd6a8', edgeText: '#6d7a50', edgeTextBg: 'rgba(255,255,255,.95)', primary: '#6f8f5a', search: '#e8890c', dimNode: 0.16, dimEdge: 0.07 },
     beach:    { name: '海滩', group: 'nature', bg: '#f8f2e7', dot: '#e8e0cc', nodeFill: '#ffffff', nodeBorder: '#2596be', nodeText: '#2c4852', subText: '#7f97a0', edge: '#e8c8a0', edgeText: '#8a6a45', edgeTextBg: 'rgba(255,255,255,.95)', primary: '#ff8c61', search: '#e0543f', dimNode: 0.16, dimEdge: 0.07 },
     autumn:   { name: '秋叶', group: 'warm', bg: '#f9f2e5', dot: '#ecddc2', nodeFill: '#ffffff', nodeBorder: '#c65f3f', nodeText: '#4a3426', subText: '#9c8468', edge: '#e8b96f', edgeText: '#7d5c35', edgeTextBg: 'rgba(255,255,255,.95)', primary: '#c98a2e', search: '#e0543f', dimNode: 0.16, dimEdge: 0.07 },
-    winter:   { name: '冬雪', group: 'cool', bg: '#f2f7fb', dot: '#dde9f5', nodeFill: '#ffffff', nodeBorder: '#a6c8e0', nodeText: '#33414f', subText: '#7d93a8', edge: '#d3e2ef', edgeText: '#5b7a95', edgeTextBg: 'rgba(255,255,255,.95)', primary: '#6b9cc4', search: '#e8890c', dimNode: 0.16, dimEdge: 0.07 }
+    winter:   { name: '冬雪', group: 'cool', bg: '#f2f7fb', dot: '#dde9f5', nodeFill: '#ffffff', nodeBorder: '#a6c8e0', nodeText: '#33414f', subText: '#7d93a8', edge: '#d3e2ef', edgeText: '#5b7a95', edgeTextBg: 'rgba(255,255,255,.95)', primary: '#6b9cc4', search: '#e8890c', dimNode: 0.16, dimEdge: 0.07 },
+    chromium: { name: '铬银', group: 'metal', bg: '#14161a', dot: '#2a2e35', nodeFill: '#1e2126', nodeBorder: '#c8d2dc', nodeText: '#eef2f5', subText: '#9aa5ae', edge: '#4a525c', edgeText: '#b7c2cb', edgeTextBg: 'rgba(20,22,26,.95)', primary: '#cfd8e3', search: '#f0a53f', dimNode: 0.16, dimEdge: 0.08 },
+    gunmetal: { name: '枪灰', group: 'metal', bg: '#12171d', dot: '#232c36', nodeFill: '#1a2129', nodeBorder: '#7f95ab', nodeText: '#e6edf3', subText: '#94a3b1', edge: '#3b4a58', edgeText: '#aec0d0', edgeTextBg: 'rgba(18,23,29,.95)', primary: '#8ba3ba', search: '#f0a53f', dimNode: 0.16, dimEdge: 0.08 },
+    rust:     { name: '铁锈红', group: 'metal', bg: '#1a1210', dot: '#33211c', nodeFill: '#241815', nodeBorder: '#c0633f', nodeText: '#f4e7e1', subText: '#b0938a', edge: '#54302a', edgeText: '#d9a791', edgeTextBg: 'rgba(26,18,16,.95)', primary: '#c0633f', search: '#e8a33d', dimNode: 0.16, dimEdge: 0.08 },
+    patina:   { name: '铜绿', group: 'metal', bg: '#10191a', dot: '#1f3030', nodeFill: '#162323', nodeBorder: '#5ba8a0', nodeText: '#e2f0ee', subText: '#94b3ae', edge: '#33504e', edgeText: '#b6d8d2', edgeTextBg: 'rgba(16,25,26,.95)', primary: '#5ba8a0', search: '#f0a53f', dimNode: 0.16, dimEdge: 0.08 },
+    tungsten: { name: '钨蓝', group: 'metal', bg: '#10131f', dot: '#202636', nodeFill: '#171c2c', nodeBorder: '#7f95cf', nodeText: '#e8ecf8', subText: '#9aa5c2', edge: '#38415e', edgeText: '#bec9e6', edgeTextBg: 'rgba(16,19,31,.95)', primary: '#8ba3d9', search: '#f0a53f', dimNode: 0.16, dimEdge: 0.08 },
+    cloud:    { name: '云朵', group: 'pastel', bg: '#f4f6f8', dot: '#dde4ea', nodeFill: '#ffffff', nodeBorder: '#9fb3c8', nodeText: '#3d4a56', subText: '#8b9aa8', edge: '#d3dde6', edgeText: '#7f93a6', edgeTextBg: 'rgba(255,255,255,.95)', primary: '#86a9c9', search: '#e8890c', dimNode: 0.16, dimEdge: 0.07 },
+    peach:    { name: '蜜桃', group: 'pastel', bg: '#fdf3ec', dot: '#f5ddce', nodeFill: '#ffffff', nodeBorder: '#f4a26c', nodeText: '#4c3527', subText: '#a5826a', edge: '#f2d3b8', edgeText: '#8f6244', edgeTextBg: 'rgba(255,255,255,.95)', primary: '#f4a26c', search: '#e0543f', dimNode: 0.16, dimEdge: 0.07 },
+    milkmint: { name: '奶薄荷', group: 'pastel', bg: '#f2f8f4', dot: '#d9e9df', nodeFill: '#ffffff', nodeBorder: '#8fcbb0', nodeText: '#33503f', subText: '#7f9a8a', edge: '#d5e8dc', edgeText: '#6f8f7c', edgeTextBg: 'rgba(255,255,255,.95)', primary: '#6db897', search: '#e8890c', dimNode: 0.16, dimEdge: 0.07 },
+    bubble:   { name: '泡泡', group: 'pastel', bg: '#f4f4fd', dot: '#dfe0f5', nodeFill: '#ffffff', nodeBorder: '#a3a8e8', nodeText: '#3f4258', subText: '#8b8eae', edge: '#d6d8f0', edgeText: '#6f74a2', edgeTextBg: 'rgba(255,255,255,.95)', primary: '#8f95e0', search: '#f59f24', dimNode: 0.16, dimEdge: 0.07 },
+    porcelain:{ name: '白瓷', group: 'pastel', bg: '#f7f5f1', dot: '#e6e0d6', nodeFill: '#ffffff', nodeBorder: '#b0a58f', nodeText: '#3c382e', subText: '#8d8575', edge: '#ded7c8', edgeText: '#6f6753', edgeTextBg: 'rgba(255,255,255,.95)', primary: '#a79a80', search: '#e8890c', dimNode: 0.16, dimEdge: 0.07 },
+    tribal:   { name: '部落', group: 'weave', bg: '#241410', dot: '#45271d', nodeFill: '#321c14', nodeBorder: '#e0784e', nodeText: '#f4e8df', subText: '#c0a08e', edge: '#5c3526', edgeText: '#e8b294', edgeTextBg: 'rgba(36,20,16,.95)', primary: '#d95b33', search: '#e8a33d', dimNode: 0.16, dimEdge: 0.08 },
+    viking:   { name: '维京', group: 'weave', bg: '#0f1d22', dot: '#213840', nodeFill: '#16262c', nodeBorder: '#7fa8b0', nodeText: '#e0ecee', subText: '#94adb3', edge: '#35505a', edgeText: '#bdd4d8', edgeTextBg: 'rgba(15,29,34,.95)', primary: '#6f9ca6', search: '#f0a53f', dimNode: 0.16, dimEdge: 0.08 },
+    caravan:  { name: '驼队', group: 'weave', bg: '#241708', dot: '#452c12', nodeFill: '#32200e', nodeBorder: '#d9a04e', nodeText: '#f4e9d4', subText: '#bfa478', edge: '#5c3f20', edgeText: '#e5c88e', edgeTextBg: 'rgba(36,23,8,.95)', primary: '#cf9536', search: '#e8890c', dimNode: 0.16, dimEdge: 0.08 },
+    totem:    { name: '图腾', group: 'weave', bg: '#121a14', dot: '#26352a', nodeFill: '#1a251e', nodeBorder: '#a04a33', nodeText: '#e8efe6', subText: '#9caf9e', edge: '#39503f', edgeText: '#c2d8c2', edgeTextBg: 'rgba(18,26,20,.95)', primary: '#c05c3f', search: '#e8890c', dimNode: 0.16, dimEdge: 0.08 },
+    persia:   { name: '波斯', group: 'weave', bg: '#1d0f14', dot: '#3a202b', nodeFill: '#2a161d', nodeBorder: '#4a6fc0', nodeText: '#f2e8e2', subText: '#b09599', edge: '#6f4a5a', edgeText: '#dcc0a8', edgeTextBg: 'rgba(29,15,20,.95)', primary: '#c25b54', search: '#e8a33d', dimNode: 0.16, dimEdge: 0.08 },
+    firework: { name: '烟火', group: 'festival', bg: '#0d1020', dot: '#22264a', nodeFill: '#151a33', nodeBorder: '#ff5f6d', nodeText: '#eef0fa', subText: '#9aa2c8', edge: '#3f4f9f', edgeText: '#c2c8f0', edgeTextBg: 'rgba(13,16,32,.95)', primary: '#ffd23f', search: '#ff8a3d', dimNode: 0.16, dimEdge: 0.08 },
+    disco:    { name: '迪斯科', group: 'festival', bg: '#0f0a1c', dot: '#2b1f52', nodeFill: '#181034', nodeBorder: '#3ee6c8', nodeText: '#f0ecfb', subText: '#a49ac4', edge: '#5a3fa8', edgeText: '#d4c8f0', edgeTextBg: 'rgba(15,10,28,.95)', primary: '#ff5fb0', search: '#ffd23f', dimNode: 0.16, dimEdge: 0.08 },
+    lantern:  { name: '灯市', group: 'festival', bg: '#1d0d0a', dot: '#45241c', nodeFill: '#2a1610', nodeBorder: '#e8564a', nodeText: '#f5e9e0', subText: '#c09a88', edge: '#6a3a2a', edgeText: '#ecc0a8', edgeTextBg: 'rgba(29,13,10,.95)', primary: '#f5b445', search: '#e8890c', dimNode: 0.16, dimEdge: 0.08 },
+    confetti: { name: '彩带', group: 'festival', bg: '#fdf4ee', dot: '#f5dcc9', nodeFill: '#ffffff', nodeBorder: '#ff6ea0', nodeText: '#4a3a50', subText: '#a08fa0', edge: '#ffd166', edgeText: '#8a6f3a', edgeTextBg: 'rgba(255,255,255,.95)', primary: '#58b8ff', search: '#e0543f', dimNode: 0.16, dimEdge: 0.07 },
+    kaleido:  { name: '万花筒', group: 'festival', bg: '#120f24', dot: '#28204e', nodeFill: '#1a1538', nodeBorder: '#7ec2ff', nodeText: '#efedfb', subText: '#a49ec8', edge: '#ffd23f', edgeText: '#f4e6b8', edgeTextBg: 'rgba(18,15,36,.95)', primary: '#ff5fb0', search: '#3ee6c8', dimNode: 0.16, dimEdge: 0.08 }
   },
 
   /* ---------- 画布版式（按主题分类组指派：节点形状 / 连线线型 / 背景 / 光效） ---------- */
   LAYOUTS: {
-    classic: { shape: 'circle', edge: 'curve',    bg: 'dots',     fx: 'none' },
-    nature:  { shape: 'circle', edge: 'curve',    bg: 'dots',     fx: 'soft' },
-    warm:    { shape: 'circle', edge: 'curve',    bg: 'dots',     fx: 'none' },
-    cool:    { shape: 'circle', edge: 'straight', bg: 'gradient', fx: 'none' },
-    pink:    { shape: 'circle', edge: 'curve',    bg: 'dots',     fx: 'soft' },
-    redgold: { shape: 'circle', edge: 'curve',    bg: 'gradient', fx: 'double' },
-    retro:   { shape: 'circle', edge: 'straight', bg: 'plain',    fx: 'double' },
-    trendy:  { shape: 'rect',   edge: 'straight', bg: 'dots',     fx: 'none' },
-    chinese: { shape: 'circle', edge: 'curve',    bg: 'plain',    fx: 'none' },
-    dessert: { shape: 'circle', edge: 'curve',    bg: 'dots',     fx: 'soft' },
-    scifi:   { shape: 'hex',    edge: 'straight', bg: 'grid',     fx: 'glow' },
-    gothic:  { shape: 'diamond', edge: 'straight', bg: 'gradient', fx: 'none' }
+    classic:  { shape: 'circle',  edge: 'curve',    bg: 'dots',     fx: 'none' },
+    nature:   { shape: 'circle',  edge: 'curve',    bg: 'dots',     fx: 'soft' },
+    warm:     { shape: 'circle',  edge: 'curve',    bg: 'gradient', fx: 'none' },
+    cool:     { shape: 'circle',  edge: 'straight', bg: 'gradient', fx: 'none' },
+    pink:     { shape: 'circle',  edge: 'curve',    bg: 'gradient', fx: 'soft' },
+    redgold:  { shape: 'circle',  edge: 'curve',    bg: 'gradient', fx: 'double' },
+    retro:    { shape: 'circle',  edge: 'straight', bg: 'plain',    fx: 'double' },
+    trendy:   { shape: 'rect',    edge: 'straight', bg: 'dots',     fx: 'none' },
+    chinese:  { shape: 'circle',  edge: 'curve',    bg: 'plain',    fx: 'none' },
+    dessert:  { shape: 'circle',  edge: 'curve',    bg: 'plain',    fx: 'soft' },
+    scifi:    { shape: 'hex',     edge: 'straight', bg: 'grid',     fx: 'glow' },
+    gothic:   { shape: 'diamond', edge: 'straight', bg: 'gradient', fx: 'none' },
+    metal:    { shape: 'rect',    edge: 'straight', bg: 'grid',     fx: 'none' },
+    pastel:   { shape: 'circle',  edge: 'straight', bg: 'dots',     fx: 'none' },
+    weave:    { shape: 'diamond', edge: 'curve',    bg: 'dots',     fx: 'none' },
+    festival: { shape: 'diamond', edge: 'curve',    bg: 'dots',     fx: 'glow' }
   },
   layoutOf(id) {
     const g = (this.THEMES[id] || {}).group || 'classic';
@@ -301,12 +325,17 @@ const Renderer = {
       ctx.fillRect(0, 0, w, h);
       if (!opts.forExport && scale >= 0.4) {
         if (layout.bg === 'dots') {
-          const step = 42 * scale;
+          // 点阵背景：圆形点，稍大更清晰（浅色主题下不再"隐形"）
+          const step = 36 * scale;
           if (w / step < 160 && h / step < 160) {
             ctx.fillStyle = th.dot;
             const ox = ((view.x % step) + step) % step, oy = ((view.y % step) + step) % step;
             for (let x = ox; x < w; x += step) {
-              for (let y = oy; y < h; y += step) ctx.fillRect(x - 0.5, y - 0.5, 1.5, 1.5);
+              for (let y = oy; y < h; y += step) {
+                ctx.beginPath();
+                ctx.arc(x, y, 1.3, 0, Math.PI * 2);
+                ctx.fill();
+              }
             }
           }
         } else if (layout.bg === 'grid') {

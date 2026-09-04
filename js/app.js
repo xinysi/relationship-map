@@ -1888,7 +1888,8 @@ const App = {
     // 主题列表直接从画布主题表派生（THEMES 带 name/group），新增主题只需改 Renderer.THEMES 一处
     const GROUP_ORDER = [['classic', '经典'], ['nature', '自然'], ['warm', '暖阳'], ['cool', '冷调'],
       ['pink', '粉紫'], ['redgold', '炽金'], ['retro', '复古'], ['trendy', '潮流'],
-      ['chinese', '国风'], ['dessert', '甜品'], ['scifi', '科幻'], ['gothic', '暗黑']];
+      ['chinese', '国风'], ['dessert', '甜品'], ['scifi', '科幻'], ['gothic', '暗黑'],
+      ['metal', '金属'], ['pastel', '暖纱'], ['weave', '织锦'], ['festival', '灯会']];
     const entries = Object.entries(Renderer.THEMES);
     const cardHTML = (id, t) => `
         <div class="theme-card ${this.currentTheme === id ? 'active' : ''}" data-theme="${id}">

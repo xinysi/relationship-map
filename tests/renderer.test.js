@@ -15,9 +15,9 @@ function graph() {
   GraphStore.reindex();
 }
 
-test('60 套主题且名称/分组完整', () => {
+test('80 套主题且名称/分组完整', () => {
   const keys = Object.keys(Renderer.THEMES);
-  assert.equal(keys.length, 60);
+  assert.equal(keys.length, 80);
   for (const k of keys) {
     assert.ok(Renderer.THEMES[k].name, `主题 ${k} 有名称`);
     assert.ok(Renderer.THEMES[k].group, `主题 ${k} 有分组`);
@@ -28,20 +28,27 @@ test('60 套主题且名称/分组完整', () => {
   assert.equal(Renderer.THEMES.coral.name, '珊瑚橘');
   assert.equal(Renderer.THEMES.cyber.name, '赛博');
   assert.equal(Renderer.THEMES.macaron.group, 'dessert');
+  assert.equal(Renderer.THEMES.chromium.group, 'metal');
+  assert.equal(Renderer.THEMES.persia.group, 'weave');
 });
 
-test('画布版式：12 组均有 layout 且每主题可解析', () => {
+test('画布版式：16 组均有 layout 且呈现形式互不相同', () => {
   const groups = new Set(Object.values(Renderer.THEMES).map(t => t.group));
   assert.equal(Object.keys(Renderer.LAYOUTS).length, groups.size);
   const shapes = ['circle', 'rect', 'hex', 'diamond'];
   const bgs = ['dots', 'grid', 'gradient', 'plain'];
   const fxs = ['none', 'soft', 'glow', 'double'];
+  const combos = new Set();
   for (const [g, l] of Object.entries(Renderer.LAYOUTS)) {
     assert.ok(shapes.includes(l.shape), `组 ${g} shape 有效`);
     assert.ok(l.edge === 'curve' || l.edge === 'straight', `组 ${g} edge 有效`);
     assert.ok(bgs.includes(l.bg), `组 ${g} bg 有效`);
     assert.ok(fxs.includes(l.fx), `组 ${g} fx 有效`);
+    const combo = `${l.shape}|${l.edge}|${l.bg}|${l.fx}`;
+    assert.ok(!combos.has(combo), `组 ${g} 版式与现有重复: ${combo}`);
+    combos.add(combo);
   }
+  assert.equal(combos.size, Object.keys(Renderer.LAYOUTS).length, '版式组合全部唯一');
   for (const id of Object.keys(Renderer.THEMES)) assert.ok(Renderer.layoutOf(id), `主题 ${id} 有版式`);
   assert.equal(Renderer.layoutOf('cyber').shape, 'hex');
   assert.equal(Renderer.layoutOf('chinese').edge, 'curve');

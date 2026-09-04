@@ -114,7 +114,7 @@ test('extract：HTTP 404 返回分类提示并带服务端响应', async () => {
 
 test('服务预设：常用服务齐全且可按 id 查找', () => {
   const ids = LlmExtract.PRESETS.map(p => p.id);
-  assert.deepEqual(ids, ['deepseek', 'openai', 'zhipu', 'qwen', 'kimi']);
+  assert.deepEqual(Array.from(ids), ['deepseek', 'openai', 'zhipu', 'qwen', 'kimi']);
   for (const p of LlmExtract.PRESETS) {
     assert.ok(p.name && p.base.startsWith('https://') && p.model, `${p.id} 字段完整`);
   }

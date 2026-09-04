@@ -8,6 +8,24 @@ const vm = require('node:vm');
 const src = fs.readFileSync(require('node:path').join(__dirname, '..', 'js', 'i18n.js'), 'utf8');
 const I18n = vm.runInNewContext(src + '\n; I18n', {});
 
+test('I18n：主题词典覆盖 80 主题与 16 组名', () => {
+  const src = fs.readFileSync(require('node:path').join(__dirname, '..', 'js', 'renderer.js'), 'utf8');
+  const nameKeys = [...src.matchAll(/name: '([^']+)'/g)].map(m => m[1]);
+  const themeDict = I18n.dict.theme;
+  const missing = nameKeys.filter(n => !themeDict[n]);
+  assert.ok(nameKeys.length >= 80, `主题数 ${nameKeys.length}`);
+  assert.deepEqual(missing, [], `缺主题词条: ${missing.join(', ')}`);
+  // 16 组
+  const groups = ['经典','自然','暖阳','冷调','粉紫','炽金','复古','潮流','国风','甜品','科幻','暗黑','金属','暖纱','织锦','灯会'];
+  assert.deepEqual(groups.filter(g => !themeDict[g]), [], '组名词条完整');
+  // trTheme 行为
+  I18n.setLang('en');
+  assert.equal(I18n.trTheme('星夜紫'), 'Starry Night');
+  assert.equal(I18n.trTheme('未收录主题'), '未收录主题');
+  I18n.setLang('zh');
+  assert.equal(I18n.trTheme('星夜紫'), '星夜紫');
+});
+
 test('I18n：trHtml 翻译文本节点与属性，未收录词条保留', () => {
   I18n.setLang('en');
   const html = '<div class="form-item"><label>添加人物</label><input placeholder="姓名"></div>' +

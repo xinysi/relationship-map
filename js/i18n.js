@@ -446,12 +446,83 @@ const I18n = {
       'SVG 矢量图': 'SVG Vector',
       'CSV（两张表）': 'CSV (two sheets)',
       '保存工程文件': 'Save Project File',
-      'SVG 矢量图无限缩放，不依赖分辨率；超高倍率受浏览器画布上限约束，达到上限会自动降档': 'SVG is vector — infinitely scalable; very high scales are capped by browser canvas limits and auto-downgraded'
+      'SVG 矢量图无限缩放，不依赖分辨率；超高倍率受浏览器画布上限约束，达到上限会自动降档': 'SVG is vector — infinitely scalable; very high scales are capped by browser canvas limits and auto-downgraded',
+      '一键导入 · 自动生成关系网': 'Import · Auto-build Relationship Web',
+      '点击选择文件，或将文件拖拽到此处': 'Click to choose files, or drop them here',
+      'Markdown 剧情文档可自动解析人物条目、ASCII 家族树、关系恩怨（×/↔）、时间线与登场速览表': 'Markdown story docs auto-parse character entries, ASCII family trees, relation conflicts (×/↔), timelines and cast lists',
+      '容错导入': 'Fault-tolerant import',
+      '错误数据跳过，正确数据正常导入': 'Skip bad rows, import valid data',
+      '首次使用？下载标准导入模板，按模板填写数据即可避免格式错误': 'First time? Download the standard template to avoid format errors',
+      '下载标准导入模板': 'Download standard template',
+      '含交互：缩放 / 悬浮 / 点击聚焦 / 时间轴': 'Interactions: zoom / hover / click focus / timeline',
+      '保存当前工程': 'Save Current Project',
+      '全选': 'Select All',
+      '暂无已保存工程': 'No saved projects yet',
+      '导入数据或添加人物后，点击「保存当前工程」即可': 'Import data or add persons, then click "Save Current Project"',
+      '操作日志（最近 300 条）': 'Operation Logs (last 300)',
+      'AI 服务（智能提取功能，可选配置）': 'AI Service (for AI extraction, optional)',
+      'OpenAI 兼容接口；密钥仅保存在本机浏览器。⚠ 使用智能提取会把文本发送至该服务。': 'OpenAI-compatible; the key stays in your browser only. ⚠ Extraction sends your text to this service.',
+      '服务地址 Base URL': 'Service URL (Base URL)',
+      '模型名': 'Model',
+      'API 密钥': 'API Key',
+      '所有数据 100% 本地离线存储，不上传云端；工程文件支持自定义密码加密': 'All data is 100% local/offline, never uploaded; project files support password encryption',
+      '默认': 'default',
+      '未找到匹配': 'No match for',
+      '的人物': 'persons found',
+      '请先填写服务地址、模型与密钥': 'Please fill in the service URL, model and key first',
+      '正在解析文件…': 'Parsing files…',
+      '已导入': 'Imported',
+      '条记录': 'records',
+      '个文件': 'files',
+      '取消全部': 'Cancel All',
+      '重试': 'Retry',
+      '查看错误日志': 'View error log',
+      '跳过错误消息': 'Skip errors',
+      '请选择人物': 'Select persons',
+      '请选择关系': 'Select relations',
+      '应用样式': 'Apply Style',
+      '清除样式': 'Clear Styles',
+      '恢复默认': 'Reset Defaults'
+    },
+
+    /* 主题专用词典：与主词典分离，避免用户数据（人名等）与主题名撞词被误翻 */
+    theme: {
+      '经典': 'Classic', '自然': 'Nature', '暖阳': 'Warm', '冷调': 'Cool',
+      '粉紫': 'Pink & Purple', '炽金': 'Red & Gold', '复古': 'Retro', '潮流': 'Trendy',
+      '国风': 'Chinese', '甜品': 'Dessert', '科幻': 'Sci-Fi', '暗黑': 'Gothic',
+      '金属': 'Metal', '暖纱': 'Pastel', '织锦': 'Weave', '灯会': 'Festival',
+      '浅色主题': 'Light', '深色主题': 'Dark', '简约主题': 'Minimal', '商务主题': 'Business',
+      '森语绿': 'Forest', '罗兰紫': 'Violet', '深海蓝': 'Ocean', '落日橙': 'Sunset',
+      '樱绯粉': 'Sakura', '薄荷青': 'Mint', '星夜紫': 'Starry Night', '鎏金黑': 'Black Gold',
+      '朱砂红': 'Cinnabar', '松林墨': 'Pine Ink', '石墨灰': 'Graphite', '蜂蜜黄': 'Honey',
+      '暮山棕': 'Coffee', '勃艮第红': 'Burgundy', '靛蓝': 'Indigo', '碧波青': 'Lagoon',
+      '珊瑚橘': 'Coral', '雾紫': 'Lavender', '青柠绿': 'Lime', '天青蓝': 'Sky',
+      '玫红': 'Rose', '火橙': 'Flame', '藏青蓝': 'Navy', '梅子紫': 'Plum',
+      '香槟金': 'Champagne', '鼠尾草': 'Sage', '陶土红': 'Terracotta', '余烬红': 'Ember',
+      '钴蓝': 'Cobalt', '洋红': 'Fuchsia', '翡翠绿': 'Emerald', '琥珀棕': 'Amber',
+      '黑曜石': 'Obsidian', '皇室紫': 'Royal', '黛青': 'Ink Teal', '丝绒绿': 'Velvet',
+      '复古撞色': 'Retro Mix', '老电影': 'Vintage Film', '像素复古': 'Pixel Retro',
+      '甜酷': 'Sweet Cool', '千禧年代': 'Y2K', '波普': 'Pop Art', '涂鸦': 'Graffiti',
+      '中式': 'Chinese Style', '水墨': 'Ink Wash', '马卡龙': 'Macaron', '糖果': 'Candy',
+      '柠檬苏打': 'Lemonade', '赛博': 'Cyberpunk', '雪花电视': 'CRT Glow', '萤光': 'Firefly',
+      '哥特': 'Gothic', '抹茶': 'Matcha', '海滩': 'Beach', '秋叶': 'Autumn',
+      '冬雪': 'Winter', '铬银': 'Chromium', '枪灰': 'Gunmetal', '铁锈红': 'Rust',
+      '铜绿': 'Patina', '钨蓝': 'Tungsten', '云朵': 'Cloud', '蜜桃': 'Peach',
+      '奶薄荷': 'Mint Milk', '泡泡': 'Bubble', '白瓷': 'Porcelain', '部落': 'Tribal',
+      '维京': 'Viking', '驼队': 'Caravan', '图腾': 'Totem', '波斯': 'Persia',
+      '烟火': 'Firework', '迪斯科': 'Disco', '灯市': 'Lantern', '彩带': 'Confetti',
+      '万花筒': 'Kaleidoscope'
     }
   },
 
   setLang(lang) {
     this.lang = (lang === 'en') ? 'en' : 'zh';
+  },
+
+  /* 主题名/主题组名专用翻译：独立词典，避免与用户数据（人物名等）误撞 */
+  trTheme(text) {
+    if (this.lang !== 'en' || text == null) return text;
+    return this.dict.theme[text] || text;
   },
 
   tr(text) {

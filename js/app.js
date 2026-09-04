@@ -1956,12 +1956,12 @@ const App = {
             <i style="width:12px;height:12px;background:${t.primary};left:52%;top:22%;opacity:.7"></i>
             <i style="width:14px;height:14px;background:${t.primary};left:64%;top:55%;opacity:.8"></i>
           </div>
-          <div class="t-name">${t.name}</div>
+          <div class="t-name">${I18n.trTheme(t.name)}</div>
         </div>`;
     const bodyHTML = GROUP_ORDER.map(([gid, gname]) => {
       const items = entries.filter(([id, t]) => (t.group || 'classic') === gid);
       if (!items.length) return '';
-      return `<div class="theme-group"><div class="theme-group-title">${gname}</div>
+      return `<div class="theme-group"><div class="theme-group-title">${I18n.trTheme(gname)}</div>
         <div class="theme-grid wide">${items.map(([id, t]) => cardHTML(id, t)).join('')}</div></div>`;
     }).join('');
     const names = Object.fromEntries(entries);
@@ -1974,7 +1974,7 @@ const App = {
         ProjectStore.saveSettings({ theme: this.currentTheme });
         GraphStore.dirty = true;
         m.close();
-        this.toast(`已切换至${names[this.currentTheme].name}`, 'success');
+        this.toast(`已切换至${I18n.trTheme(names[this.currentTheme].name)}`, 'success');
       };
     });
   },

@@ -12,25 +12,25 @@
 
   <!-- ===== 顶部栏 ===== -->
   <header id="topbar">
-    <div class="logo" title="人物关系网可视化工具"><span class="logo-icon">🕸</span><span class="logo-text">人物关系网</span></div>
-    <div class="proj-name" id="projName" title="点击重命名工程">未命名工程</div>
+    <div class="logo" title="人物关系网可视化工具"><span class="logo-icon">🕸</span><span class="logo-text" data-i18n="人物关系网">人物关系网</span></div>
+    <div class="proj-name" id="projName" data-i18n="未命名工程" data-i18n-attr="title" title="点击重命名工程">未命名工程</div>
     <div class="search-wrap" id="searchWrap">
       <span class="search-icon">🔍</span>
-      <input id="searchInput" type="text" placeholder="搜索姓名 / 别名 / ID / 标签 / 身份…" autocomplete="off">
-      <button class="search-clear hidden" id="searchClear" title="清空搜索">✕</button>
+      <input id="searchInput" type="text" placeholder="搜索姓名 / 别名 / ID / 标签 / 身份…" autocomplete="off" data-i18n="搜索姓名 / 别名 / ID / 标签 / 身份…" data-i18n-attr="placeholder">
+      <button class="search-clear hidden" id="searchClear" data-i18n="清空搜索" data-i18n-attr="title" title="清空搜索">✕</button>
       <div id="searchResults" class="dropdown hidden"></div>
     </div>
     <div class="top-actions">
-      <button class="tbtn" id="btnUndo" title="撤销 (Ctrl+Z)">↩</button>
-      <button class="tbtn" id="btnRedo" title="重做 (Ctrl+Y)">↪</button>
+      <button class="tbtn" id="btnUndo" data-i18n="撤销 (Ctrl+Z)" data-i18n-attr="title" title="撤销 (Ctrl+Z)">↩</button>
+      <button class="tbtn" id="btnRedo" data-i18n="重做 (Ctrl+Y)" data-i18n-attr="title" title="重做 (Ctrl+Y)">↪</button>
       <span class="tsep"></span>
-      <button class="tbtn primary" id="btnImport" title="导入数据 (Ctrl+Shift+I)">⬆ 导入</button>
-      <button class="tbtn" id="btnExport" title="导出 (Ctrl+Shift+E)">⬇ 导出</button>
+      <button class="tbtn primary" id="btnImport" data-i18n="导入" data-i18n-attr="title" title="导入数据 (Ctrl+Shift+I)">⬆ 导入</button>
+      <button class="tbtn" id="btnExport" data-i18n="导出" data-i18n-attr="title" title="导出 (Ctrl+Shift+E)">⬇ 导出</button>
       <span class="tsep"></span>
-      <button class="tbtn" id="btnSave" title="保存工程 (Ctrl+S)">💾 保存</button>
-      <button class="tbtn" id="btnProjects" title="工程列表">🗂 工程</button>
-      <button class="tbtn" id="btnSettings" title="设置">⚙</button>
-      <button class="tbtn" id="btnFullscreen" title="画布全屏显示（ESC 退出）">⛶</button>
+      <button class="tbtn" id="btnSave" data-i18n="保存" data-i18n-attr="title" title="保存工程 (Ctrl+S)">💾 保存</button>
+      <button class="tbtn" id="btnProjects" data-i18n="工程" data-i18n-attr="title" title="工程列表">🗂 工程</button>
+      <button class="tbtn" id="btnSettings" data-i18n="设置" data-i18n-attr="title" title="设置">⚙</button>
+      <button class="tbtn" id="btnFullscreen" data-i18n="画布全屏显示（ESC 退出）" data-i18n-attr="title" title="画布全屏显示（ESC 退出）">⛶</button>
     </div>
   </header>
 
@@ -39,53 +39,53 @@
     <!-- 左侧功能菜单栏 -->
     <aside id="sidebar">
       <div class="nav-section">
-        <div class="nav-title">文件</div>
-        <button class="nav-item" data-cmd="newProject"><i>📄</i>新建工程</button>
-        <button class="nav-item" data-cmd="openProjectFile"><i>📂</i>打开工程文件</button>
-        <button class="nav-item" data-cmd="saveProject"><i>💾</i>保存工程</button>
-        <button class="nav-item" data-cmd="projectList"><i>🗂</i>工程列表</button>
+        <div class="nav-title" data-i18n="文件">文件</div>
+        <button  data-i18n="新建工程"class="nav-item" data-cmd="newProject"><i>📄</i>新建工程</button>
+        <button  data-i18n="打开工程文件"class="nav-item" data-cmd="openProjectFile"><i>📂</i>打开工程文件</button>
+        <button  data-i18n="保存工程"class="nav-item" data-cmd="saveProject"><i>💾</i>保存工程</button>
+        <button  data-i18n="工程列表"class="nav-item" data-cmd="projectList"><i>🗂</i>工程列表</button>
       </div>
       <div class="nav-section">
-        <div class="nav-title">数据</div>
-        <button class="nav-item" data-cmd="import"><i>⬆</i>导入数据</button>
-        <button class="nav-item" data-cmd="llmExtract"><i>🤖</i>AI 智能提取</button>
-        <button class="nav-item" data-cmd="template"><i>📋</i>下载模板</button>
-        <button class="nav-item" data-cmd="export"><i>⬇</i>导出</button>
+        <div class="nav-title" data-i18n="数据">数据</div>
+        <button  data-i18n="导入数据"class="nav-item" data-cmd="import"><i>⬆</i>导入数据</button>
+        <button  data-i18n="AI 智能提取"class="nav-item" data-cmd="llmExtract"><i>🤖</i>AI 智能提取</button>
+        <button  data-i18n="下载模板"class="nav-item" data-cmd="template"><i>📋</i>下载模板</button>
+        <button  data-i18n="导出"class="nav-item" data-cmd="export"><i>⬇</i>导出</button>
       </div>
       <div class="nav-section">
-        <div class="nav-title">编辑</div>
-        <button class="nav-item" data-cmd="addPerson"><i>👤</i>添加人物</button>
-        <button class="nav-item" data-cmd="addRelation"><i>🔗</i>添加关系</button>
+        <div class="nav-title" data-i18n="编辑">编辑</div>
+        <button  data-i18n="添加人物"class="nav-item" data-cmd="addPerson"><i>👤</i>添加人物</button>
+        <button  data-i18n="添加关系"class="nav-item" data-cmd="addRelation"><i>🔗</i>添加关系</button>
         <button class="nav-item" data-cmd="batchEdit" id="navBatchEdit"><i>✏️</i>批量编辑</button>
       </div>
       <div class="nav-section">
-        <div class="nav-title">布局</div>
-        <button class="nav-item" data-cmd="layout-force"><i>🌌</i>力导向布局</button>
-        <button class="nav-item" data-cmd="layout-circular"><i>⭕</i>环形布局</button>
-        <button class="nav-item" data-cmd="layout-tree"><i>🌳</i>层级树状布局</button>
-        <button class="nav-item" data-cmd="layout-grid"><i>▦</i>网格布局</button>
-        <button class="nav-item" data-cmd="layout-grouped"><i>🌐</i>分簇布局</button>
-        <button class="nav-item" data-cmd="layout-community"><i>🧩</i>自动分簇</button>
-        <button class="nav-item" data-cmd="layout-radial"><i>☀</i>放射状布局</button>
+        <div class="nav-title" data-i18n="布局">布局</div>
+        <button  data-i18n="力导向布局"class="nav-item" data-cmd="layout-force"><i>🌌</i>力导向布局</button>
+        <button  data-i18n="环形布局"class="nav-item" data-cmd="layout-circular"><i>⭕</i>环形布局</button>
+        <button  data-i18n="层级树状布局"class="nav-item" data-cmd="layout-tree"><i>🌳</i>层级树状布局</button>
+        <button  data-i18n="网格布局"class="nav-item" data-cmd="layout-grid"><i>▦</i>网格布局</button>
+        <button  data-i18n="分簇布局"class="nav-item" data-cmd="layout-grouped"><i>🌐</i>分簇布局</button>
+        <button  data-i18n="自动分簇"class="nav-item" data-cmd="layout-community"><i>🧩</i>自动分簇</button>
+        <button  data-i18n="放射状布局"class="nav-item" data-cmd="layout-radial"><i>☀</i>放射状布局</button>
       </div>
       <div class="nav-section">
-        <div class="nav-title">视图</div>
-        <button class="nav-item" data-cmd="zoomIn"><i>➕</i>放大</button>
-        <button class="nav-item" data-cmd="zoomOut"><i>➖</i>缩小</button>
-        <button class="nav-item" data-cmd="resetView"><i>🎯</i>重置视图</button>
-        <button class="nav-item" data-cmd="fitView"><i>🖼</i>自适应画布</button>
+        <div class="nav-title" data-i18n="视图">视图</div>
+        <button  data-i18n="放大"class="nav-item" data-cmd="zoomIn"><i>➕</i>放大</button>
+        <button  data-i18n="缩小"class="nav-item" data-cmd="zoomOut"><i>➖</i>缩小</button>
+        <button  data-i18n="重置视图"class="nav-item" data-cmd="resetView"><i>🎯</i>重置视图</button>
+        <button  data-i18n="自适应画布"class="nav-item" data-cmd="fitView"><i>🖼</i>自适应画布</button>
         <button class="nav-item" data-cmd="toggleBoxSelect" id="navBoxSelect"><i>⬚</i>框选模式</button>
       </div>
       <div class="nav-section">
-        <div class="nav-title">外观</div>
-        <button class="nav-item" data-cmd="themes"><i>🎨</i>主题切换</button>
-        <button class="nav-item" data-cmd="styleSettings"><i>🧩</i>全局样式</button>
+        <div class="nav-title" data-i18n="外观">外观</div>
+        <button  data-i18n="主题切换"class="nav-item" data-cmd="themes"><i>🎨</i>主题切换</button>
+        <button  data-i18n="全局样式"class="nav-item" data-cmd="styleSettings"><i>🧩</i>全局样式</button>
       </div>
       <div class="nav-section">
-        <div class="nav-title">帮助</div>
-        <button class="nav-item" data-cmd="shortcuts"><i>⌨</i>快捷键</button>
-        <button class="nav-item" data-cmd="guide"><i>💡</i>新手引导</button>
-        <button class="nav-item" data-cmd="about"><i>ℹ</i>关于</button>
+        <div class="nav-title" data-i18n="帮助">帮助</div>
+        <button  data-i18n="快捷键"class="nav-item" data-cmd="shortcuts"><i>⌨</i>快捷键</button>
+        <button  data-i18n="新手引导"class="nav-item" data-cmd="guide"><i>💡</i>新手引导</button>
+        <button  data-i18n="关于"class="nav-item" data-cmd="about"><i>ℹ</i>关于</button>
       </div>
     </aside>
 
@@ -97,25 +97,25 @@
       <div id="modeHint" class="hidden"></div>
       <div id="focusBar" class="hidden">
         <span id="focusText"></span>
-        <button id="btnExitFocus">退出溯源</button>
+        <button id="btnExitFocus" data-i18n="退出溯源">退出溯源</button>
       </div>
       <!-- 全屏/折叠浮动按钮（随状态显隐） -->
       <div id="canvasFloat" class="hidden">
-        <button class="flbtn" id="floatRestorePanel" title="展开右侧详情面板">« 详情</button>
-        <button class="flbtn" id="floatExitFullscreen" title="退出画布全屏">⛶ 退出</button>
+        <button class="flbtn" id="floatRestorePanel" title="展开右侧详情面板">« <span data-i18n="详情">详情</span></button>
+        <button class="flbtn" id="floatExitFullscreen" title="退出画布全屏">⛶ <span data-i18n="退出">退出</span></button>
       </div>
       <div id="welcome">
         <div class="welcome-card">
           <div class="welcome-logo">🕸</div>
-          <h2>欢迎使用人物关系网可视化工具</h2>
-          <p>一键批量导入 Excel / CSV / JSON 数据，自动生成动态可交互的人物关系网。<br>所有数据仅保存在本地，安全无忧。</p>
+          <h2 data-i18n="欢迎使用人物关系网可视化工具">欢迎使用人物关系网可视化工具</h2>
+          <p data-i18n="一键批量导入 Excel / CSV / JSON 数据，自动生成动态可交互的人物关系网。">一键批量导入 Excel / CSV / JSON 数据，自动生成动态可交互的人物关系网。<br>所有数据仅保存在本地，安全无忧。</p>
           <div class="welcome-actions">
-            <button class="big-btn primary" id="wImport">⬆ 导入数据生成关系网</button>
-            <button class="big-btn" id="wSample">🎉 加载示例数据体验</button>
-            <button class="big-btn" id="wAdd">👤 手动添加人物</button>
-            <button class="big-btn" id="wOpen">📂 打开历史工程</button>
+            <button class="big-btn primary" id="wImport" data-i18n="导入数据生成关系网">⬆ 导入数据生成关系网</button>
+            <button class="big-btn" id="wSample" data-i18n="加载示例数据体验">🎉 加载示例数据体验</button>
+            <button class="big-btn" id="wAdd" data-i18n="手动添加人物">👤 手动添加人物</button>
+            <button class="big-btn" id="wOpen" data-i18n="打开历史工程">📂 打开历史工程</button>
           </div>
-          <div class="welcome-tips">提示：支持 Excel / CSV / JSON / Markdown 剧情文档，模板可在「数据 → 下载模板」获取</div>
+          <div class="welcome-tips" data-i18n="提示：支持 Excel / CSV / JSON / Markdown 剧情文档，模板可在「数据 → 下载模板」获取">提示：支持 Excel / CSV / JSON / Markdown 剧情文档，模板可在「数据 → 下载模板」获取</div>
         </div>
       </div>
     </div>
@@ -123,41 +123,41 @@
     <!-- 右侧详情面板 -->
     <aside id="rightPanel">
       <div class="rp-tabs">
-        <button class="rp-tab active" data-tab="detail">属性详情</button>
-        <button class="rp-tab" data-tab="filter">筛选</button>
-        <button class="rp-tab" data-tab="timeline">时间轴</button>
-        <button class="rp-collapse" id="rpCollapse" title="折叠右侧详情面板">»</button>
+        <button class="rp-tab active" data-tab="detail" data-i18n="属性详情">属性详情</button>
+        <button class="rp-tab" data-tab="filter" data-i18n="筛选">筛选</button>
+        <button class="rp-tab" data-tab="timeline" data-i18n="时间轴">时间轴</button>
+        <button class="rp-collapse" id="rpCollapse" data-i18n="折叠右侧详情面板" data-i18n-attr="title" title="折叠右侧详情面板">»</button>
       </div>
       <div id="tab-detail" class="rp-body">
-        <div class="empty-tip">单击节点或关系线<br>查看 / 编辑详细信息</div>
+        <div class="empty-tip" data-i18n="单击节点或关系线">单击节点或关系线<br>查看 / 编辑详细信息</div>
       </div>
       <div id="tab-filter" class="rp-body hidden">
         <div class="filter-block">
-          <div class="filter-title">按人物分组筛选</div>
-          <div id="filterGroups" class="filter-list"><div class="empty-tip">暂无分组数据</div></div>
+          <div class="filter-title" data-i18n="按人物分组筛选">按人物分组筛选</div>
+          <div id="filterGroups" class="filter-list"><div class="empty-tip" data-i18n="暂无分组数据">暂无分组数据</div></div>
         </div>
         <div class="filter-block">
-          <div class="filter-title">按关系类型筛选</div>
-          <div id="filterTypes" class="filter-list"><div class="empty-tip">暂无关系数据</div></div>
+          <div class="filter-title" data-i18n="按关系类型筛选">按关系类型筛选</div>
+          <div id="filterTypes" class="filter-list"><div class="empty-tip" data-i18n="暂无关系数据">暂无关系数据</div></div>
         </div>
         <div class="filter-block">
-          <div class="filter-title">按关系强度筛选（最低强度）</div>
+          <div class="filter-title" data-i18n="按关系强度筛选（最低强度）">按关系强度筛选（最低强度）</div>
           <div class="strength-row">
             <input type="range" id="filterStrength" min="0" max="10" step="1" value="0">
-            <span id="filterStrengthVal">全部</span>
+            <span id="filterStrengthVal" data-i18n="全部">全部</span>
           </div>
         </div>
         <div class="filter-actions">
-          <button class="btn danger-ghost" id="btnClearFilter">一键清空筛选</button>
+          <button class="btn danger-ghost" id="btnClearFilter" data-i18n="一键清空筛选">一键清空筛选</button>
         </div>
       </div>
       <div id="tab-timeline" class="rp-body hidden">
         <div class="tl-toolbar">
-          <input type="text" id="tlFilter" placeholder="筛选时期 / 篇章 / 关键词…">
-          <button class="btn sm" id="btnClearHighlight" title="清除事件聚焦高亮">清除聚焦</button>
+          <input type="text" id="tlFilter" placeholder="筛选时期 / 篇章 / 关键词…" data-i18n="筛选时期 / 篇章 / 关键词…" data-i18n-attr="placeholder">
+          <button class="btn sm" id="btnClearHighlight" data-i18n="清除聚焦" title="清除事件聚焦高亮">清除聚焦</button>
         </div>
         <div id="timelineList">
-          <div class="empty-tip">暂无时间线事件<br>导入含时间线的剧情文档或<br>在模板「时间线事件表」中填写</div>
+          <div class="empty-tip" data-i18n="暂无时间线事件">暂无时间线事件<br>导入含时间线的剧情文档或<br>在模板「时间线事件表」中填写</div>
         </div>
       </div>
     </aside>
@@ -184,6 +184,7 @@
 <!-- 离线依赖与业务脚本（顺序加载，支持 file:// 双击直接使用） -->
 <script src="js/vendor/xlsx.full.min.js"></script>
 <script src="js/utils.js"></script>
+<script src="js/i18n.js"></script>
 <script src="js/sample-data.js"></script>
 <script src="js/model.js"></script>
 <script src="js/community.js"></script>

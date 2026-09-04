@@ -19,6 +19,10 @@ const App = {
     await ProjectStore.init();
     const settings = ProjectStore.loadSettings();
     this.currentTheme = settings.theme || 'light';
+    // 界面语言（中/英）：设置后替换全部静态文案，动态文案经 I18n.tr 实时翻译
+    I18n.setLang(settings.lang || 'zh');
+    document.title = I18n.tr('人物关系网可视化工具');
+    I18n.applyDom(document);
 
     Renderer.init(document.getElementById('canvas'));
     Renderer.setThemeName(this.currentTheme);
@@ -60,6 +64,7 @@ const App = {
     const root = document.getElementById('toastRoot');
     const el = document.createElement('div');
     el.className = 'toast ' + (type || 'info');
+    text = I18n.tr(text);
     // 配色以画布主题表（JS 单一可信源）为准，CSS 主题块兜底：
     // 恢复工程等场景中主题可能来自工程文件（含用户自定义主题），CSS 未必有对应规则，
     // 直接读 CSS 变量会回退浅色；从 Renderer.theme 读取保证提示条总是与画布一致
@@ -92,7 +97,7 @@ const App = {
     mask.className = 'modal-mask';
     mask.innerHTML = `
       <div class="modal" ${width ? `style="width:${width}px"` : ''}>
-        <div class="modal-header"><h3>${Utils.escapeHtml(title)}</h3><button class="modal-close">✕</button></div>
+        <div class="modal-header"><h3>${Utils.escapeHtml(I18n.tr(title))}</h3><button class="modal-close">✕</button></div>
         <div class="modal-body"></div>
         ${footerHTML ? `<div class="modal-footer">${footerHTML}</div>` : ''}
       </div>`;
@@ -269,7 +274,7 @@ const App = {
     // 筛选
     document.getElementById('filterStrength').addEventListener('input', (e) => {
       const v = Number(e.target.value);
-      document.getElementById('filterStrengthVal').textContent = v === 0 ? '全部' : `≥ ${v}`;
+      document.getElementById('filterStrengthVal').textContent = v === 0 ? I18n.tr('全部') : `≥ ${v}`;
       GraphStore.setFilter({ minStrength: v });
     });
     document.getElementById('btnClearFilter').onclick = () => {
@@ -720,8 +725,8 @@ const App = {
     const menu = document.getElementById('ctxMenu');
     menu.innerHTML = items.map((it, i) => {
       if (it.sep) return '<div class="cm-sep"></div>';
-      if (it.label2) return `<div class="cm-label">${Utils.escapeHtml(it.label2)}</div>`;
-      return `<button class="cm-item ${it.danger ? 'danger' : ''}" data-i="${i}">${Utils.escapeHtml(it.label)}</button>`;
+      if (it.label2) return `<div class="cm-label">${Utils.escapeHtml(I18n.tr(it.label2))}</div>`;
+      return `<button class="cm-item ${it.danger ? 'danger' : ''}" data-i="${i}">${Utils.escapeHtml(I18n.tr(it.label))}</button>`;
     }).join('');
     menu.classList.remove('hidden');
     const mw = menu.offsetWidth, mh = menu.offsetHeight;
@@ -895,17 +900,20 @@ const App = {
   },
   updateFocusBar() {
     const bar = document.getElementById('focusBar');
+    const en = I18n.lang === 'en';
     if (GraphStore.focus.depth > 0) {
       const names = { 1: '一级', 2: '二级', 999: '全层级' };
       const p = GraphStore.getPerson(GraphStore.focus.nodeId);
-      document.getElementById('focusText').textContent =
-        `关联溯源中：【${p ? p.name : ''}】${names[GraphStore.focus.depth] || ''}关联（可见 ${GraphStore.focus.ids.size} 人）`;
-      document.getElementById('btnExitFocus').textContent = '退出溯源';
+      document.getElementById('focusText').textContent = en
+        ? `Tracing relations: [${p ? p.name : ''}] ${I18n.tr(names[GraphStore.focus.depth] || '')} (${GraphStore.focus.ids.size} visible)`
+        : `关联溯源中：【${p ? p.name : ''}】${names[GraphStore.focus.depth] || ''}关联（可见 ${GraphStore.focus.ids.size} 人）`;
+      document.getElementById('btnExitFocus').textContent = I18n.tr('退出溯源');
       bar.classList.remove('hidden');
     } else if (GraphStore.highlight.ids && GraphStore.highlight.ids.size) {
-      document.getElementById('focusText').textContent =
-        `事件聚焦中：《${GraphStore.highlight.label}》（高亮 ${GraphStore.highlight.ids.size} 位关联人物）`;
-      document.getElementById('btnExitFocus').textContent = '退出聚焦';
+      document.getElementById('focusText').textContent = en
+        ? `Event focus: "${GraphStore.highlight.label}" (${GraphStore.highlight.ids.size} related persons highlighted)`
+        : `事件聚焦中：《${GraphStore.highlight.label}》（高亮 ${GraphStore.highlight.ids.size} 位关联人物）`;
+      document.getElementById('btnExitFocus').textContent = en ? 'Exit Focus' : '退出聚焦';
       bar.classList.remove('hidden');
     } else bar.classList.add('hidden');
   },
@@ -1080,7 +1088,7 @@ const App = {
     }
     document.getElementById('filterStrength').value = GraphStore.filter.minStrength;
     document.getElementById('filterStrengthVal').textContent =
-      GraphStore.filter.minStrength === 0 ? '全部' : `≥ ${GraphStore.filter.minStrength}`;
+      GraphStore.filter.minStrength === 0 ? I18n.tr('全部') : `≥ ${GraphStore.filter.minStrength}`;
   },
 
   /* ============================================================
@@ -1642,8 +1650,8 @@ const App = {
       bodyHTML: `
         <div class="dt-section-title" style="border:none;margin-top:0;padding-top:0">可视化成果导出（无水印）</div>
         <div class="form-item" style="max-width:280px"><label>图片分辨率（PNG / JPG / PDF 适用）</label>
-          <select id="expScale"><option value="1">标准 1×（适合屏幕查看）</option><option value="2" selected>高清 2×（推荐）</option><option value="3">超清 3×（适合打印）</option></select>
-          <div class="form-hint">SVG 矢量图无限缩放，不依赖分辨率</div></div>
+          <select id="expScale"><option value="1">标准 1×（适合屏幕查看）</option><option value="2" selected>高清 2×（推荐）</option><option value="3">超清 3×（适合打印）</option><option value="4">极清 4×（大图展示）</option><option value="6">海报级 6×（印刷输出）</option></select>
+          <div class="form-hint">SVG 矢量图无限缩放，不依赖分辨率；超高倍率受浏览器画布上限约束，达到上限会自动降档</div></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
           <button class="btn" data-act="png">PNG 图片</button>
           <button class="btn" data-act="jpg">JPG 图片</button>
@@ -1678,9 +1686,9 @@ const App = {
       if (GraphStore.isEmpty()) { this.toast(DataIO.MSG.EMPTY_EXPORT, 'warn'); return false; }
       return true;
     };
-    m.body.parentElement.querySelector('[data-act=png]').onclick = async () => { if (imgGuard()) { const r = await DataIO.exportImage('png', scale()); if (r && r.ok) this.toast(`PNG 已导出（${r.w}×${r.h}）`, 'success'); } };
-    m.body.parentElement.querySelector('[data-act=jpg]').onclick = async () => { if (imgGuard()) { const r = await DataIO.exportImage('jpg', scale()); if (r && r.ok) this.toast(`JPG 已导出（${r.w}×${r.h}）`, 'success'); } };
-    m.body.parentElement.querySelector('[data-act=pngt]').onclick = async () => { if (imgGuard()) { const r = await DataIO.exportImage('png-transparent', scale()); if (r && r.ok) this.toast(`透明底 PNG 已导出（${r.w}×${r.h}）`, 'success'); } };
+    m.body.parentElement.querySelector('[data-act=png]').onclick = async () => { if (imgGuard()) { const r = await DataIO.exportImage('png', scale()); if (r && r.ok) this.toast(`PNG 已导出（${r.w}×${r.h}${r.scaled ? '，' + I18n.tr('达到画布上限，已自动降档') : ''}）`, 'success'); } };
+    m.body.parentElement.querySelector('[data-act=jpg]').onclick = async () => { if (imgGuard()) { const r = await DataIO.exportImage('jpg', scale()); if (r && r.ok) this.toast(`JPG 已导出（${r.w}×${r.h}${r.scaled ? '，' + I18n.tr('达到画布上限，已自动降档') : ''}）`, 'success'); } };
+    m.body.parentElement.querySelector('[data-act=pngt]').onclick = async () => { if (imgGuard()) { const r = await DataIO.exportImage('png-transparent', scale()); if (r && r.ok) this.toast(`透明底 PNG 已导出（${r.w}×${r.h}${r.scaled ? '，' + I18n.tr('达到画布上限，已自动降档') : ''}）`, 'success'); } };
     m.body.parentElement.querySelector('[data-act=pdf]').onclick = () => { if (imgGuard()) { const r = DataIO.exportPDF(scale()); if (r && r.ok) this.toast('PDF 文件已导出', 'success'); } };
     m.body.parentElement.querySelector('[data-act=svg]').onclick = () => {
       if (imgGuard()) {
@@ -2030,6 +2038,12 @@ const App = {
         <div class="form-item" style="margin-top:10px"><label>自动保存间隔（10 - 300 秒）</label>
           <div class="range-row"><input type="range" id="set-interval" min="10" max="300" step="5" value="${Utils.clamp(s.autosaveInterval || 30, 10, 300)}"><span class="rv" id="set-intervalV">${Utils.clamp(s.autosaveInterval || 30, 10, 300)}s</span></div></div>
 
+        <div class="dt-section-title">界面语言</div>
+        <div class="form-item" style="max-width:280px"><select id="set-lang">
+          <option value="zh" ${(s.lang || 'zh') === 'zh' ? 'selected' : ''}>中文（简体）</option>
+          <option value="en" ${s.lang === 'en' ? 'selected' : ''}>English</option>
+        </select></div>
+
         <div class="dt-section-title">导入默认布局</div>
         <div class="form-item"><select id="set-layout">
           <option value="force" ${s.defaultLayout === 'force' ? 'selected' : ''}>力导向布局（默认）</option>
@@ -2092,16 +2106,25 @@ const App = {
       btn.disabled = false; btn.textContent = '测试连接';
     };
     m.body.parentElement.querySelector('[data-act=ok]').onclick = () => {
+      const lang = m.body.querySelector('#set-lang').value;
+      const prevLang = ProjectStore.loadSettings().lang || 'zh';
       ProjectStore.saveSettings({
         autosave: m.body.querySelector('#set-autosave').checked,
         autosaveInterval: Number(m.body.querySelector('#set-interval').value),
         defaultLayout: m.body.querySelector('#set-layout').value,
+        lang,
         llmBase: m.body.querySelector('#set-llmBase').value.trim(),
         llmModel: m.body.querySelector('#set-llmModel').value.trim(),
         llmKey: m.body.querySelector('#set-llmKey').value.trim()
       });
       this.applyAutosave();
       m.close();
+      if (lang !== prevLang) {
+        // 语言切换后刷新页面，确保全量静态文案（含反向恢复）准确一致
+        this.toast('语言已切换，页面刷新中…', 'info');
+        setTimeout(() => location.reload(), 600);
+        return;
+      }
       this.toast('设置已保存', 'success');
     };
   },
@@ -2247,7 +2270,7 @@ const App = {
      全局刷新
      ============================================================ */
   updateAll() {
-    document.getElementById('projName').textContent = GraphStore.projectName;
+    document.getElementById('projName').textContent = I18n.tr(GraphStore.projectName);
     this.renderDetailPanel();
     this.updateStatus();
     this.updateFocusBar();
@@ -2261,21 +2284,22 @@ const App = {
     const vp = GraphStore.visiblePersons().length;
     const vr = GraphStore.visibleRelations().length;
     const evCount = (GraphStore.events || []).length;
+    const N = I18n.tr, en = I18n.lang === 'en';
     document.getElementById('sbStats').textContent =
-      `节点 ${GraphStore.persons.length}${vp !== GraphStore.persons.length ? `（显示 ${vp}）` : ''} · 关系 ${GraphStore.relations.length}${vr !== GraphStore.relations.length ? `（显示 ${vr}）` : ''}${evCount ? ` · 事件 ${evCount}` : ''}`;
+      `${en ? 'Nodes' : '节点'} ${GraphStore.persons.length}${vp !== GraphStore.persons.length ? `（${en ? 'showing' : '显示'} ${vp}）` : ''} · ${en ? 'Relations' : '关系'} ${GraphStore.relations.length}${vr !== GraphStore.relations.length ? `（${en ? 'showing' : '显示'} ${vr}）` : ''}${evCount ? ` · ${en ? 'Events' : '事件'} ${evCount}` : ''}`;
     document.getElementById('sbSelection').textContent =
-      GraphStore.selection.size ? `已选中 ${GraphStore.selection.size} 个节点` : (GraphStore.selectedEdgeId ? '已选中 1 条关系' : '');
+      GraphStore.selection.size ? `${en ? 'Selected' : '已选中'} ${GraphStore.selection.size} ${en ? 'node(s)' : '个节点'}` : (GraphStore.selectedEdgeId ? (en ? '1 relation selected' : '已选中 1 条关系') : '');
     const sbFilter = document.getElementById('sbFilter');
     const active = GraphStore.hasActiveFilter() || GraphStore.focus.depth > 0;
     sbFilter.classList.toggle('hidden', !active);
     if (GraphStore.focus.depth > 0) {
       const names = { 1: '一级溯源', 2: '二级溯源', 999: '全层级溯源' };
-      sbFilter.textContent = names[GraphStore.focus.depth] || '溯源中';
-    } else sbFilter.textContent = '筛选中';
+      sbFilter.textContent = names[GraphStore.focus.depth] ? N(names[GraphStore.focus.depth]) : (en ? 'Tracing' : '溯源中');
+    } else sbFilter.textContent = N('筛选中');
     document.getElementById('sbZoom').textContent = Math.round(Renderer.view.scale * 100) + '%';
     const layoutNames = { force: '力导向', circular: '环形', tree: '树状', grid: '网格', grouped: '分簇', community: '自动分簇', radial: '放射状' };
     document.getElementById('sbLayout').textContent =
-      GraphStore.isEmpty() ? '' : `布局：${layoutNames[ProjectStore.loadSettings().defaultLayout] || '力导向'}`;
+      GraphStore.isEmpty() ? '' : `${en ? 'Layout' : '布局'}：${N(layoutNames[ProjectStore.loadSettings().defaultLayout] || '力导向')}`;
   }
 };
 

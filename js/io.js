@@ -1459,7 +1459,7 @@ const DataIO = {
      ============================================================ */
 
   /* 渲染关系网到离屏画布
-     倍率策略：优先满足用户倍率，仅当超出「面积预算(36MP) → 单边 12000」时等比降档（保持纵横比），
+     倍率策略：优先满足用户倍率，仅当超出「面积预算(90MP) → 单边 16384」时等比降档（保持纵横比），
      避免超大 canvas 内存溢出；scaled=true 表示实际倍率低于用户选择，用于导出提示 */
   renderToCanvas(scale, transparent, opts) {
     if (GraphStore.isEmpty()) { return { error: this.MSG.EMPTY_EXPORT }; }
@@ -1468,9 +1468,9 @@ const DataIO = {
     const pad = 40;
     const rawW = bbox.w + pad * 2, rawH = bbox.h + pad * 2;
     let s = scale || 1;
-    if (rawW * s * rawH * s > 36e6) s *= Math.sqrt(36e6 / (rawW * rawH * s * s));
+    if (rawW * s * rawH * s > 90e6) s *= Math.sqrt(90e6 / (rawW * rawH * s * s));
     const maxSide = Math.max(rawW, rawH) * s;
-    if (maxSide > 12000) s *= 12000 / maxSide;
+    if (maxSide > 16384) s *= 16384 / maxSide;
     const w = Math.ceil(rawW * s), h = Math.ceil(rawH * s);
     const cv = document.createElement('canvas');
     cv.width = w; cv.height = h;

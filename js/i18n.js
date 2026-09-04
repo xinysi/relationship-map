@@ -1,0 +1,274 @@
+'use strict';
+/* ============================================================
+   界面语言：中 / 英切换（字典以「中文原文」为 key）
+   - 静态文案：index.html 中标记 data-i18n，启动时 applyDom() 全量替换
+   - 动态文案：toast/弹窗标题/右键菜单等经 I18n.tr() 翻译
+   - 未收录词条保持中文，逐步扩充
+   ============================================================ */
+const I18n = {
+  lang: 'zh',
+  dict: {
+    en: {
+      /* 顶栏 / 通用 */
+      '人物关系网可视化工具': 'Relationship Network Visualizer',
+      '人物关系网': 'Relationship Web',
+      '未命名工程': 'Untitled Project',
+      '点击重命名工程': 'Click to rename project',
+      '搜索姓名 / 别名 / ID / 标签 / 身份…': 'Search name / alias / ID / tag / role…',
+      '清空搜索': 'Clear search',
+      '撤销 (Ctrl+Z)': 'Undo (Ctrl+Z)',
+      '重做 (Ctrl+Y)': 'Redo (Ctrl+Y)',
+      '导入数据 (Ctrl+Shift+I)': 'Import data (Ctrl+Shift+I)',
+      '导出 (Ctrl+Shift+E)': 'Export (Ctrl+Shift+E)',
+      '保存工程 (Ctrl+S)': 'Save project (Ctrl+S)',
+      '工程列表': 'Projects',
+      '设置': 'Settings',
+      '画布全屏显示（ESC 退出）': 'Fullscreen canvas (ESC to exit)',
+      '导入': 'Import',
+      '导出': 'Export',
+      '保存': 'Save',
+      '工程': 'Projects',
+
+      /* 侧栏 */
+      '文件': 'File',
+      '数据': 'Data',
+      '编辑': 'Edit',
+      '布局': 'Layout',
+      '视图': 'View',
+      '外观': 'Appearance',
+      '帮助': 'Help',
+      '新建工程': 'New Project',
+      '打开工程文件': 'Open Project File',
+      '保存工程': 'Save Project',
+      '导入数据': 'Import Data',
+      'AI 智能提取': 'AI Extraction',
+      '下载模板': 'Download Template',
+      '添加人物': 'Add Person',
+      '添加关系': 'Add Relation',
+      '批量编辑': 'Batch Edit',
+      '力导向布局': 'Force Layout',
+      '环形布局': 'Circular Layout',
+      '层级树状布局': 'Tree Layout',
+      '网格布局': 'Grid Layout',
+      '分簇布局': 'Cluster Layout',
+      '自动分簇': 'Auto Cluster',
+      '放射状布局': 'Radial Layout',
+      '放大': 'Zoom In',
+      '缩小': 'Zoom Out',
+      '重置视图': 'Reset View',
+      '自适应画布': 'Fit Canvas',
+      '框选模式': 'Box Select',
+      '主题切换': 'Themes',
+      '全局样式': 'Global Styles',
+      '快捷键': 'Shortcuts',
+      '新手引导': 'Guide',
+      '关于': 'About',
+
+      /* 画布 / 欢迎页 */
+      '欢迎使用人物关系网可视化工具': 'Welcome to Relationship Network Visualizer',
+      '一键批量导入 Excel / CSV / JSON 数据，自动生成动态可交互的人物关系网。': 'Import Excel / CSV / JSON in batches to auto-build an interactive relationship web.',
+      '所有数据仅保存在本地，安全无忧。': 'All data stays on your device only — safe and private.',
+      '导入数据生成关系网': 'Import Data',
+      '加载示例数据体验': 'Load Sample Data',
+      '手动添加人物': 'Add a Person',
+      '打开历史工程': 'Open Existing Project',
+      '提示：支持 Excel / CSV / JSON / Markdown 剧情文档，模板可在「数据 → 下载模板」获取': 'Tip: Excel / CSV / JSON / Markdown supported; get templates via "Data → Download Template"',
+      '退出溯源': 'Exit Trace',
+      '展开右侧详情面板': 'Expand detail panel',
+      '详情': 'Details',
+      '退出': 'Exit',
+      '单击节点或关系线': 'Click a node or edge',
+      '查看 / 编辑详细信息': 'View / edit details',
+
+      /* 右侧面板 */
+      '属性详情': 'Details',
+      '筛选': 'Filter',
+      '时间轴': 'Timeline',
+      '折叠右侧详情面板': 'Collapse detail panel',
+      '按人物分组筛选': 'Filter by Group',
+      '暂无分组数据': 'No groups yet',
+      '按关系类型筛选': 'Filter by Relation Type',
+      '暂无关系数据': 'No relations yet',
+      '按关系强度筛选（最低强度）': 'Filter by Strength (min)',
+      '全部': 'All',
+      '一键清空筛选': 'Clear All Filters',
+      '筛选时期 / 篇章 / 关键词…': 'Filter era / chapter / keyword…',
+      '清除聚焦': 'Clear Focus',
+      '暂无时间线事件': 'No timeline events yet',
+      '节点': 'Nodes',
+      '关系': 'Relations',
+      '事件': 'Events',
+      '筛选中': 'Filtering',
+
+      /* 右键菜单 */
+      '编辑人物': 'Edit Person',
+      '从此添加关系': 'Add Relation Here',
+      '查找与某人的最短路径': 'Find Shortest Path',
+      '展开一级关联': 'Trace Level 1',
+      '展开二级关联': 'Trace Level 2',
+      '展开全层级关联': 'Trace All Levels',
+      '定位居中': 'Center on View',
+      '删除人物': 'Delete Person',
+      '编辑关系': 'Edit Relation',
+      '选中并定位': 'Select & Center',
+      '删除关系': 'Delete Relation',
+      '在此添加人物': 'Add Person Here',
+      '核心人物分析': 'Central Person Analysis',
+      '锁定位置': 'Lock Position',
+      '解锁位置': 'Unlock Position',
+      '一级溯源': 'Trace Level 1',
+      '二级溯源': 'Trace Level 2',
+      '全层级溯源': 'Trace All Levels',
+      '事件聚焦': 'Event Focus',
+
+      /* 通用按钮 / 弹窗 */
+      '确定': 'OK',
+      '取消': 'Cancel',
+      '关闭': 'Close',
+      '保存配置': 'Save Config',
+      '开始提取': 'Extract',
+      '应用提取结果': 'Apply Results',
+      '替换当前画布': 'Replace Canvas',
+      '追加到当前画布': 'Append to Canvas',
+      '重命名工程': 'Rename Project',
+      '工程名称': 'Project Name',
+      '工程密码': 'Project Password',
+      '请输入工程密码': 'Enter project password',
+      '恢复': 'Restore',
+      '新建空白工程': 'New Blank Project',
+      '加密密码（可选，留空则不加密）': 'Encryption password (optional)',
+      '自定义密码锁定重要工程': 'Lock project with a password',
+      '图片分辨率（PNG / JPG / PDF 适用）': 'Image resolution (PNG / JPG / PDF)',
+      '标准 1×（适合屏幕查看）': 'Standard 1× (screen)',
+      '高清 2×（推荐）': 'HD 2× (recommended)',
+      '超清 3×（适合打印）': 'Ultra 3× (print)',
+      '极清 4×（大图展示）': '4K 4× (large display)',
+      '海报级 6×（印刷输出）': 'Poster 6× (printing)',
+      'SVG 矢量图无限缩放，不依赖分辨率': 'SVG is vector — infinitely scalable',
+      '含边标签': 'Include edge labels',
+      '源数据导出（可二次修改 / 存档 / 复用）': 'Source data (editable / archive / reuse)',
+      '分享发布（单文件，对方双击即看）': 'Share (single file, opens anywhere)',
+      '只读分享页（单文件 HTML）': 'Read-only Share Page (HTML)',
+      '工程文件（包含节点位置 / 样式 / 布局信息，可恢复编辑状态）': 'Project file (positions / styles / layout, fully restorable)',
+      '导出中心': 'Export Center',
+      '可视化成果导出（无水印）': 'Visual export (no watermark)',
+      '系统设置': 'System Settings',
+      '自动保存': 'Autosave',
+      '开启自动保存（定时备份工程数据，防止数据丢失）': 'Enable autosave (periodic backup to prevent data loss)',
+      '自动保存间隔（10 - 300 秒）': 'Autosave interval (10–300 s)',
+      '导入默认布局': 'Default Layout on Import',
+      '界面语言': 'Language',
+      '语言': 'Language',
+      '中文': 'Chinese',
+      'English': 'English',
+
+      /* toast / 提示 */
+      '已保存': 'Saved',
+      '已保存工程': 'Project saved',
+      '工程已保存': 'Project saved',
+      '已导出': 'Exported',
+      '工程文件已导出': 'Project file exported',
+      '已加密': 'encrypted',
+      '未找到匹配的人物': 'No matching person',
+      '已清除事件聚焦': 'Event focus cleared',
+      '已清空全部筛选条件，恢复完整视图': 'Filters cleared, full view restored',
+      '已进入画布全屏（可折叠右侧面板，ESC 退出）': 'Fullscreen on (collapsible right panel, ESC to exit)',
+      '已退出画布全屏': 'Fullscreen off',
+      '已切换至': 'Switched to',
+      '已应用：人物': 'Applied: persons',
+      '关系': 'Relations',
+      '事件': 'Events',
+      '已固定显示': 'Pinned to show',
+      '的关联，再次点击该人物或按 ESC 恢复': 'relations; click the person again or press ESC to restore',
+      '已取消固定显示': 'Unpinned',
+      '已复制': 'Copied',
+      '删除成功': 'Deleted',
+      '已删除': 'Deleted',
+      '个工程': 'projects',
+      '已添加人物': 'Person added',
+      '已添加关系': 'Relation added',
+      '已更新': 'Updated',
+      '导入完成': 'Import complete',
+      '导入已取消': 'Import cancelled',
+      '解析完成': 'Parse complete',
+      '正在解析并校验数据…': 'Parsing & validating…',
+      '正在写入画布…': 'Writing to canvas…',
+      '正在自动布局…': 'Auto-layout…',
+      '已应用：': 'Applied: ',
+      '条跳过/警告': 'skipped/warned',
+      'AI 服务配置已保存': 'AI settings saved',
+      '尚未配置 AI 服务': 'AI service not configured yet',
+      '请填写完整的服务地址 / 模型名 / 密钥': 'Please fill in service URL / model / API key',
+      '提取失败：': 'Extraction failed: ',
+      '无法连接 AI 服务：': 'Cannot reach AI service: ',
+      'AI 请求超时（120 秒），请重试或换更小段文本': 'AI request timed out, retry or use a smaller text',
+      'AI 服务返回错误': 'AI service error',
+      'PNG 已导出': 'PNG exported',
+      'JPG 已导出': 'JPG exported',
+      '透明底 PNG 已导出': 'Transparent PNG exported',
+      'PDF 文件已导出': 'PDF exported',
+      'SVG 矢量图已导出': 'SVG exported',
+      'JSON 源数据已导出': 'JSON source exported',
+      'CSV 源数据已导出': 'CSV source exported',
+      'Excel 源数据已导出': 'Excel source exported',
+      '只读分享页已导出': 'Share page exported',
+      '工程命名失败': 'Rename failed',
+      '请输入工程名称': 'Enter project name',
+      '正在保存…': 'Saving…',
+      '保存中': 'Saving',
+      '自动保存已开启': 'Autosave on',
+      '自动保存已关闭': 'Autosave off',
+      '已退出编辑模式': 'Exited edit mode',
+      '提示': 'Tip',
+      '警告': 'Warning',
+      '错误': 'Error',
+      '强度': 'Strength',
+      '时间：': 'Time: ',
+      '备注：': 'Note: ',
+      '简介': 'Intro',
+      '关联关系': 'Relations',
+      '人物ID': 'Person ID',
+      '删除': 'Delete',
+      '编辑': 'Edit',
+      '复制': 'Copy',
+      '撤销': 'Undo',
+      '重做': 'Redo',
+      '搜索未命中': 'No hit',
+      'N/A': 'N/A',
+      '来源：': 'From: ',
+      '达到画布上限，已自动降档': 'Canvas limit reached, auto-downgraded'
+    }
+  },
+
+  setLang(lang) {
+    this.lang = (lang === 'en') ? 'en' : 'zh';
+  },
+
+  tr(text) {
+    if (this.lang !== 'en') return text;
+    if (text == null) return text;
+    if (text in this.dict.en) return this.dict.en[text];
+    // 数字/符号与中文混排：按连续中文段分段查表，未收录段保持原文
+    return String(text).split(/([\u4e00-\u9fff]+)/).map(seg =>
+      (seg in this.dict.en ? this.dict.en[seg] : seg)
+    ).join('');
+  },
+
+  /* 静态文案替换：data-i18n 标记元素。
+     文本替换仅作用于「纯文本子节点」（完整等于 key），保留 <i> 等图标子元素；
+     属性替换用 data-i18n-attr="placeholder|title" 指定 */
+  applyDom(root) {
+    if (this.lang !== 'en') return;
+    const els = (root || document).querySelectorAll('[data-i18n]');
+    els.forEach(el => {
+      const key = el.getAttribute('data-i18n');
+      const val = this.dict.en[key];
+      if (val == null) return;
+      const attr = el.getAttribute('data-i18n-attr');
+      if (attr) { el.setAttribute(attr, val); return; }
+      el.childNodes.forEach(n => {
+        if (n.nodeType === 3 && n.textContent.trim() === key) n.textContent = val;
+      });
+    });
+  }
+};

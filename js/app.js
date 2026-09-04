@@ -99,12 +99,12 @@ const App = {
       <div class="modal" ${width ? `style="width:${width}px"` : ''}>
         <div class="modal-header"><h3>${Utils.escapeHtml(I18n.tr(title))}</h3><button class="modal-close">✕</button></div>
         <div class="modal-body"></div>
-        ${footerHTML ? `<div class="modal-footer">${footerHTML}</div>` : ''}
+        ${footerHTML ? `<div class="modal-footer">${I18n.trHtml(footerHTML)}</div>` : ''}
       </div>`;
     root.appendChild(mask);
     const modal = mask.querySelector('.modal');
     const body = modal.querySelector('.modal-body');
-    body.innerHTML = bodyHTML || '';
+    body.innerHTML = I18n.trHtml(bodyHTML || '');
 
     const close = () => { mask.remove(); };
     mask.querySelector('.modal-close').onclick = close;
@@ -390,7 +390,7 @@ const App = {
     if (!list) return;
     const events = GraphStore.events || [];
     if (!events.length) {
-      list.innerHTML = '<div class="empty-tip">暂无时间线事件<br>导入含时间线的剧情文档或<br>在模板「时间线事件表」中填写</div>';
+      list.innerHTML = I18n.trHtml('<div class="empty-tip">暂无时间线事件<br>导入含时间线的剧情文档或<br>在模板「时间线事件表」中填写</div>');
       return;
     }
     const kw = (document.getElementById('tlFilter').value || '').trim().toLowerCase();
@@ -403,7 +403,7 @@ const App = {
       groups.get(era).push({ e, i });
     });
     if (!groups.size) {
-      list.innerHTML = `<div class="empty-tip">没有匹配"${Utils.escapeHtml(kw)}"的事件</div>`;
+      list.innerHTML = I18n.trHtml(`<div class="empty-tip">没有匹配"${Utils.escapeHtml(kw)}"的事件</div>`);
       return;
     }
     let html = '';
@@ -428,7 +428,7 @@ const App = {
           </div>`;
       }
     }
-    list.innerHTML = html;
+    list.innerHTML = I18n.trHtml(html);
     list.querySelectorAll('.tl-item').forEach(el => {
       el.onclick = () => this.focusEvent(events[Number(el.dataset.idx)]);
     });
@@ -926,14 +926,14 @@ const App = {
     if (!q) { box.classList.add('hidden'); return; }
     if (!hits) hits = GraphStore.search(q);
     if (!hits.length) {
-      box.innerHTML = `<div class="sr-empty">未找到匹配"${Utils.escapeHtml(q)}"的人物</div>`;
+      box.innerHTML = I18n.trHtml(`<div class="sr-empty">未找到匹配"${Utils.escapeHtml(q)}"的人物</div>`);
     } else {
-      box.innerHTML = hits.slice(0, 30).map(p => `
+      box.innerHTML = I18n.trHtml(hits.slice(0, 30).map(p => `
         <button class="sr-item" data-id="${Utils.escapeHtml(p.id)}">
           <span class="dot" style="background:${Utils.colorForGroup(p.group)}"></span>
           <span>${Utils.escapeHtml(p.name)}</span>
           <span class="sr-sub">${Utils.escapeHtml([p.group, p.position].filter(Boolean).join(' · ') || p.id)}</span>
-        </button>`).join('');
+        </button>`).join(''));
       box.querySelectorAll('.sr-item').forEach(btn => {
         btn.onclick = () => { this.selectAndFocus(btn.dataset.id); box.classList.add('hidden'); };
       });
@@ -957,11 +957,11 @@ const App = {
     const box = document.getElementById('tab-detail');
     if (GraphStore.selectedEdgeId) {
       const r = GraphStore.getRelation(GraphStore.selectedEdgeId);
-      if (r) { box.innerHTML = this.edgeDetailHTML(r); this.bindDetailEvents(box); return; }
+      if (r) { box.innerHTML = I18n.trHtml(this.edgeDetailHTML(r)); this.bindDetailEvents(box); return; }
     }
     if (GraphStore.selection.size === 1) {
       const p = GraphStore.getPerson([...GraphStore.selection][0]);
-      if (p) { box.innerHTML = this.personDetailHTML(p); this.bindDetailEvents(box); return; }
+      if (p) { box.innerHTML = I18n.trHtml(this.personDetailHTML(p)); this.bindDetailEvents(box); return; }
     }
     if (GraphStore.selection.size > 1) {
       box.innerHTML = `
@@ -1058,11 +1058,11 @@ const App = {
     const gBox = document.getElementById('filterGroups');
     const tBox = document.getElementById('filterTypes');
 
-    if (!groups.size) gBox.innerHTML = '<div class="empty-tip" style="padding:8px">暂无分组数据</div>';
+    if (!groups.size) gBox.innerHTML = I18n.trHtml('<div class="empty-tip" style="padding:8px">暂无分组数据</div>');
     else {
-      gBox.innerHTML = [...groups.entries()].map(([g, c]) => `
+      gBox.innerHTML = I18n.trHtml([...groups.entries()].map(([g, c]) => `
         <label><input type="checkbox" data-group="${Utils.escapeHtml(g)}" ${GraphStore.isGroupHidden(g) ? '' : 'checked'}>
-          <span>${Utils.escapeHtml(g)}</span><span class="cnt">${c}</span></label>`).join('');
+          <span>${Utils.escapeHtml(g)}</span><span class="cnt">${c}</span></label>`).join(''));
       gBox.querySelectorAll('input[data-group]').forEach(cb => {
         cb.onchange = () => {
           const g = cb.dataset.group;
@@ -1072,11 +1072,11 @@ const App = {
         };
       });
     }
-    if (!types.size) tBox.innerHTML = '<div class="empty-tip" style="padding:8px">暂无关系数据</div>';
+    if (!types.size) tBox.innerHTML = I18n.trHtml('<div class="empty-tip" style="padding:8px">暂无关系数据</div>');
     else {
-      tBox.innerHTML = [...types.entries()].map(([t, c]) => `
+      tBox.innerHTML = I18n.trHtml([...types.entries()].map(([t, c]) => `
         <label><input type="checkbox" data-type="${Utils.escapeHtml(t)}" ${GraphStore.isTypeHidden(t) ? '' : 'checked'}>
-          <span>${Utils.escapeHtml(t)}</span><span class="cnt">${c}</span></label>`).join('');
+          <span>${Utils.escapeHtml(t)}</span><span class="cnt">${c}</span></label>`).join(''));
       tBox.querySelectorAll('input[data-type]').forEach(cb => {
         cb.onchange = () => {
           const t = cb.dataset.type;
@@ -1787,9 +1787,9 @@ const App = {
 
     const listBox = m.body.querySelector('#projList');
     if (!sorted.length) {
-      listBox.innerHTML = '<div class="proj-empty">暂无已保存工程<br>导入数据或添加人物后，点击「保存当前工程」即可</div>';
+      listBox.innerHTML = I18n.trHtml('<div class="proj-empty">暂无已保存工程<br>导入数据或添加人物后，点击「保存当前工程」即可</div>');
     } else {
-      listBox.innerHTML = sorted.map(pr => `
+      listBox.innerHTML = I18n.trHtml(sorted.map(pr => `
         <div class="proj-item" data-id="${pr.id}">
           <label class="proj-check" title="选择该工程"><input type="checkbox" class="projSel" data-id="${pr.id}"></label>
           ${pr.preview ? `<img class="proj-thumb" src="${Utils.escapeHtml(pr.preview)}">` : `<div class="proj-thumb" style="display:flex;align-items:center;justify-content:center;color:var(--sub)">🕸</div>`}
@@ -1802,7 +1802,7 @@ const App = {
             <button class="btn sm" data-act="rename">重命名</button>
             <button class="btn danger-ghost sm" data-act="del">删除</button>
           </div>
-        </div>`).join('');
+        </div>`).join(''));
       listBox.querySelectorAll('.proj-item').forEach(item => {
         const id = item.dataset.id;
         item.querySelector('[data-act=open]').onclick = async () => { m.close(); await this.loadProjectById(id); };

@@ -632,7 +632,7 @@ const Renderer = {
         ctx.font = fontLabel;
         ctx.textAlign = 'center'; ctx.textBaseline = 'top';
         ctx.fillStyle = st.textColor || th.nodeText;
-        ctx.fillText(p.name || '未命名', X, Y + r + 4);
+        ctx.fillText(p.name || I18n.tr('未命名'), X, Y + r + 4);
       }
       ctx.globalAlpha = 1;
     }

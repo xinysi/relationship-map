@@ -8,6 +8,22 @@ const vm = require('node:vm');
 const src = fs.readFileSync(require('node:path').join(__dirname, '..', 'js', 'i18n.js'), 'utf8');
 const I18n = vm.runInNewContext(src + '\n; I18n', {});
 
+test('I18n：trHtml 翻译文本节点与属性，未收录词条保留', () => {
+  I18n.setLang('en');
+  const html = '<div class="form-item"><label>添加人物</label><input placeholder="姓名"></div>' +
+    '<button class="btn">确定</button><span>自定义内容乙</span>';
+  const out = I18n.trHtml(html);
+  assert.ok(out.includes('Add Person'), '文本节点翻译');
+  assert.ok(out.includes('placeholder="Name"'), 'placeholder 属性翻译');
+  assert.ok(out.includes('OK'), '按钮文本翻译');
+  assert.ok(out.includes('自定义内容乙'), '未收录词条保留中文');
+  assert.ok(out.includes('<div class="form-item">'), 'HTML 标签不受影响');
+  assert.equal(I18n.trHtml(null), null);
+  // 中文模式原样返回
+  I18n.setLang('zh');
+  assert.equal(I18n.trHtml(html), html);
+});
+
 test('I18n：字典结构完整（每个词条有英文值）', () => {
   const en = I18n.dict.en;
   assert.ok(en && Object.keys(en).length > 100, `词条数量 ${Object.keys(en).length} 应超过 100`);

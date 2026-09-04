@@ -60,6 +60,12 @@ body[data-theme="sakura"] {
   --primary: #e06a8f; --primary-h: #d2587e; --primary-soft: #fae7ee;
   --shadow: 0 6px 24px rgba(150,60,95,.12);
 }
+body[data-theme="mint"] {
+  --bg: #eef7f5; --panel: #ffffff; --panel2: #f2f9f7;
+  --border: #d7eae5; --text: #1f3a36; --sub: #6f8d87;
+  --primary: #14b8a6; --primary-h: #0fa89a; --primary-soft: #e0f4f0;
+  --shadow: 0 6px 24px rgba(20,110,95,.12);
+}
 
 * { margin:0; padding:0; box-sizing:border-box; }
 html, body { height:100%; overflow:hidden; }

@@ -28,7 +28,8 @@ const Renderer = {
     violet:   { name: '罗兰紫', bg: '#f4f1fa', dot: '#dcd2ee', nodeFill: '#ffffff', nodeBorder: '#8b5cf6', nodeText: '#352d45', subText: '#857ba0', edge: '#c3b7e2', edgeText: '#5f5480', edgeTextBg: 'rgba(255,255,255,.95)', primary: '#8b5cf6', search: '#f59f24', dimNode: 0.16, dimEdge: 0.07 },
     ocean:    { name: '深海蓝', bg: '#0a1a2b', dot: '#1d3a57', nodeFill: '#12283f', nodeBorder: '#4fa3d9', nodeText: '#dceaf5', subText: '#8aa7bd', edge: '#37597a', edgeText: '#a8c4dc', edgeTextBg: 'rgba(10,26,43,.95)', primary: '#4fa3d9', search: '#f0a53f', dimNode: 0.16, dimEdge: 0.08 },
     sunset:   { name: '落日橙', bg: '#fdf3ea', dot: '#f2ddcc', nodeFill: '#ffffff', nodeBorder: '#e8823a', nodeText: '#4a3527', subText: '#9c7f66', edge: '#e8d3bd', edgeText: '#7d5c3e', edgeTextBg: 'rgba(255,255,255,.95)', primary: '#e8823a', search: '#e0543f', dimNode: 0.16, dimEdge: 0.07 },
-    sakura:   { name: '樱绯粉', bg: '#fdf1f5', dot: '#f3d8e1', nodeFill: '#ffffff', nodeBorder: '#e06a8f', nodeText: '#4a2f3c', subText: '#a8838f', edge: '#ecc5d2', edgeText: '#8f5a6e', edgeTextBg: 'rgba(255,255,255,.95)', primary: '#e06a8f', search: '#f59f24', dimNode: 0.16, dimEdge: 0.07 }
+    sakura:   { name: '樱绯粉', bg: '#fdf1f5', dot: '#f3d8e1', nodeFill: '#ffffff', nodeBorder: '#e06a8f', nodeText: '#4a2f3c', subText: '#a8838f', edge: '#ecc5d2', edgeText: '#8f5a6e', edgeTextBg: 'rgba(255,255,255,.95)', primary: '#e06a8f', search: '#f59f24', dimNode: 0.16, dimEdge: 0.07 },
+    mint:     { name: '薄荷青', bg: '#eef7f5', dot: '#d3e9e4', nodeFill: '#ffffff', nodeBorder: '#14b8a6', nodeText: '#1f3a36', subText: '#6f8d87', edge: '#b3dcd5', edgeText: '#407b72', edgeTextBg: 'rgba(255,255,255,.95)', primary: '#14b8a6', search: '#f59f24', dimNode: 0.16, dimEdge: 0.07 }
   },
 
   init(canvas) {

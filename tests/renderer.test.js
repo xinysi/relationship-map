@@ -15,11 +15,12 @@ function graph() {
   GraphStore.reindex();
 }
 
-test('9 套主题且名称完整', () => {
+test('10 套主题且名称完整', () => {
   const keys = Object.keys(Renderer.THEMES);
-  assert.equal(keys.length, 9);
+  assert.equal(keys.length, 10);
   for (const k of keys) assert.ok(Renderer.THEMES[k].name, `主题 ${k} 有名称`);
   assert.equal(Renderer.THEMES.violet.name, '罗兰紫');
+  assert.equal(Renderer.THEMES.mint.name, '薄荷青');
 });
 
 test('_highlightCtx：pinned 优先于 hover', () => {

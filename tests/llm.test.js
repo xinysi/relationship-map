@@ -97,6 +97,21 @@ test('extract：两次都空返回时抛出诊断信息', async () => {
   globalThis.fetch = orig;
 });
 
+test('extract：HTTP 404 返回分类提示并带服务端响应', async () => {
+  const orig = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({ error: { message: 'Model Not Exist' } }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+  LlmExtract.saveSettings({ llmKey: 'sk-x', llmBase: 'https://api.deepseek.com/v1', llmModel: 'bad-model' });
+  await assert.rejects(LlmExtract.extract('文本'), (e) => {
+    assert.ok(e.message.includes('HTTP 404'), '含状态码');
+    assert.ok(e.message.includes('模型名不存在'), '含分类提示');
+    assert.ok(e.message.includes('Model Not Exist'), '含服务端响应内容');
+    return true;
+  });
+  globalThis.fetch = orig;
+  // 恢复默认模型，避免污染后续 settings 测试
+  LlmExtract.saveSettings({ llmModel: 'deepseek-chat', llmBase: 'https://api.deepseek.com/v1' });
+});
+
 test('settings 默认值与合并', () => {
   LlmExtract.saveSettings({ llmKey: '' });
   const s = LlmExtract.settings();

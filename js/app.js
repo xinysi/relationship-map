@@ -1375,10 +1375,22 @@ const App = {
       title: '🤖 AI 智能提取 · 文本 → 人物关系网',
       width: 640,
       bodyHTML: `
-        ${cfg.llmKey ? '' : `<div class="form-hint" style="color:var(--err);margin-bottom:8px">⚠ 尚未配置 AI 服务（系统设置 → AI 服务）。<a href="javascript:void(0)" id="llmGoCfg" style="color:var(--primary)">前往设置</a></div>`}
+        ${cfg.llmKey ? '' : `<div class="form-hint" style="color:var(--err);margin-bottom:8px">⚠ 尚未配置 AI 服务，请展开下方「配置 AI 服务」或到 系统设置 → AI 服务 填写。</div>`}
+        <div class="form-hint" style="margin-bottom:8px">
+          <a href="javascript:void(0)" id="llmToggleCfg" style="color:var(--primary)">⚙ 配置 AI 服务（当前：${Utils.escapeHtml(cfg.llmModel || '未设置')}）</a>
+        </div>
+        <div id="llmCfgPanel" class="hidden" style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:12px;background:var(--panel2)">
+          <div class="form-item"><label>服务地址（OpenAI 兼容，DeepSeek 示例：https://api.deepseek.com/v1）</label>
+            <input type="text" id="llmBase" value="${Utils.escapeHtml(cfg.llmBase || '')}" placeholder="https://api.deepseek.com/v1"></div>
+          <div class="form-item"><label>模型名</label>
+            <input type="text" id="llmModel" value="${Utils.escapeHtml(cfg.llmModel || '')}" placeholder="deepseek-chat"></div>
+          <div class="form-item"><label>API 密钥（仅保存在本机浏览器）</label>
+            <input type="password" id="llmKey" value="${Utils.escapeHtml(cfg.llmKey || '')}" placeholder="sk-…"></div>
+          <button class="btn primary" id="llmSaveCfg">保存配置</button>
+        </div>
         <div class="form-item"><label>粘贴任意小说 / 剧本文本（约 1.5 万字内）</label>
           <textarea id="llmText" rows="10" placeholder="粘贴正文，AI 将自动抽取人物、关系与事件…" style="width:100%;resize:vertical"></textarea></div>
-        <div class="form-hint" style="margin-bottom:10px">⚠ 隐私提示：文本将发送至你配置的第三方 AI 服务（当前：${Utils.escapeHtml(cfg.llmModel)}）用于提取，发送前请确认内容可接受。</div>
+        <div class="form-hint" style="margin-bottom:10px">⚠ 隐私提示：文本将发送至你配置的第三方 AI 服务（当前：${Utils.escapeHtml(cfg.llmModel || '未设置')}）用于提取，发送前请确认内容可接受。</div>
         <div id="llmProgress" class="hidden">
           <div class="progress-wrap"><div class="progress-bar"><div class="progress-inner"></div></div><div class="progress-text">准备中…</div></div>
         </div>
@@ -1386,8 +1398,23 @@ const App = {
       footerHTML: `<button class="btn" data-act="cancel">关闭</button><button class="btn primary" data-act="run">🤖 开始提取</button>`
     });
     m.body.parentElement.querySelector('[data-act=cancel]').onclick = m.close;
-    const goCfg = m.body.querySelector('#llmGoCfg');
-    if (goCfg) goCfg.onclick = () => { m.close(); this.openSettings(); };
+    // 折叠式配置面板：不离开窗口即可修改服务/模型/密钥，已粘贴文本不丢失
+    const cfgPanel = m.body.querySelector('#llmCfgPanel');
+    const toggleCfg = m.body.querySelector('#llmToggleCfg');
+    toggleCfg.onclick = () => {
+      const hidden = cfgPanel.classList.toggle('hidden');
+      toggleCfg.textContent = (hidden ? '⚙ 配置 AI 服务' : '▾ 收起配置') + `（当前：${ProjectStore.loadSettings().llmModel || '未设置'}）`;
+    };
+    m.body.querySelector('#llmSaveCfg').onclick = () => {
+      const base = m.body.querySelector('#llmBase').value.trim().replace(/\/+$/, '');
+      const model = m.body.querySelector('#llmModel').value.trim();
+      const key = m.body.querySelector('#llmKey').value.trim();
+      if (!base || !model || !key) { this.toast('请填写完整的服务地址 / 模型名 / 密钥', 'warn'); return; }
+      ProjectStore.saveSettings({ llmBase: base, llmModel: model, llmKey: key });
+      cfgPanel.classList.add('hidden');
+      toggleCfg.textContent = `⚙ 配置 AI 服务（当前：${model}）`;
+      this.toast('AI 服务配置已保存', 'success');
+    };
     m.body.parentElement.querySelector('[data-act=run]').onclick = async () => {
       const text = m.body.querySelector('#llmText').value;
       const bar = m.body.querySelector('#llmProgress');

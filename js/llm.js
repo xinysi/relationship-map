@@ -86,7 +86,16 @@ JSON 结构：
     if (!resp.ok) {
       let detail = '';
       try { detail = (await resp.text()).slice(0, 160); } catch (e) { /* ignore */ }
-      throw new Error(`AI 服务返回错误（HTTP ${resp.status}）${detail ? '：' + detail : '。请检查密钥/模型名是否正确'}`);
+      const hint = resp.status === 401 || resp.status === 403
+        ? 'API 密钥无效或无权限'
+        : resp.status === 404
+          ? '服务地址或模型名不存在（检查服务地址是否包含 /v1，模型名是否正确）'
+          : resp.status === 429
+            ? '请求超限（账号额度或频率限制）'
+            : resp.status >= 500
+              ? 'AI 服务端异常，请稍后重试'
+              : '请求被拒绝';
+      throw new Error(`AI 服务返回错误（HTTP ${resp.status}）：${hint}${detail ? '（响应：' + detail + '）' : ''}`);
     }
     const data = await resp.json();
     const msg = (data && data.choices && data.choices[0] && data.choices[0].message) || {};

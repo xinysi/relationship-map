@@ -1460,6 +1460,10 @@ const App = {
             return;
           }
           const applied = DataIO.applyImport(parsed, mode);
+          // 与导入管线一致：应用后按默认布局自动排布，避免节点全部重叠在原点
+          const settings = ProjectStore.loadSettings();
+          await Layouts.apply(settings.defaultLayout || 'force');
+          Renderer.fitView();
           const errs = (parsed.errors || []).filter(e => e.level !== 'info').length;
           this.toast(`已应用：人物 ${applied.persons} · 关系 ${applied.relations}${applied.events ? ' · 事件 ' + applied.events : ''}${errs ? `（${errs} 条跳过/警告）` : ''}`, 'success');
           m.close();

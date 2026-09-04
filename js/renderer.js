@@ -388,6 +388,46 @@ const Renderer = {
 
   _drawFolded(ctx, view, w, h, opts) {
     const th = this.theme;
+    const layout = this.layoutOf(this._themeId);
+    const scale = view.scale;
+    // 背景（与常规绘制一致：先清底，避免上一帧原图残留叠加）
+    if (!opts.transparent) {
+      ctx.fillStyle = th.bg;
+      ctx.fillRect(0, 0, w, h);
+      if (scale >= 0.4) {
+        if (layout.bg === 'dots') {
+          const step = 36 * scale;
+          if (w / step < 160 && h / step < 160) {
+            ctx.fillStyle = th.dot;
+            const ox = ((view.x % step) + step) % step, oy = ((view.y % step) + step) % step;
+            for (let x = ox; x < w; x += step) {
+              for (let y = oy; y < h; y += step) {
+                ctx.beginPath();
+                ctx.arc(x, y, 1.3, 0, Math.PI * 2);
+                ctx.fill();
+              }
+            }
+          }
+        } else if (layout.bg === 'grid') {
+          const step = 48 * scale;
+          if (w / step < 160 && h / step < 160) {
+            ctx.strokeStyle = th.edge;
+            ctx.globalAlpha = 0.55;
+            ctx.lineWidth = 1;
+            const ox = ((view.x % step) + step) % step, oy = ((view.y % step) + step) % step;
+            for (let x = ox; x < w; x += step) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+            for (let y = oy; y < h; y += step) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+            ctx.globalAlpha = 1;
+          }
+        } else if (layout.bg === 'gradient') {
+          const rg = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.72);
+          rg.addColorStop(0, th.bg);
+          rg.addColorStop(1, th.dot);
+          ctx.fillStyle = rg;
+          ctx.fillRect(0, 0, w, h);
+        }
+      }
+    }
     const d = this.ensureFoldData();
     const meta = this.foldMeta();
     const fs = opts.forExport ? view.scale : 1;

@@ -26,6 +26,23 @@ test('parseCSVText：引号/转义/分隔符', () => {
   assert.deepEqual(Array.from(rows[1]), ['x,y', 'z', 'q"q']);
 });
 
+test('Markdown 模板：模板自身可被解析（人物/关系/事件齐全）', () => {
+  const parsed = DataIO.parseMarkdown(DataIO.MD_TEMPLATE, '模板.md');
+  const names = parsed.persons.map(p => p.name);
+  for (const n of ['主角', '安娜·格雷', '盖尔·史密斯', '杰迪', '赫尔曼', '路易莎·格雷', '罗伯特·格雷', '格雷']) {
+    assert.ok(names.some(x => x.includes(n)), `模板应识别人物 ${n}，实际: ${names.join('、')}`);
+  }
+  const rels = parsed.relations;
+  const types = rels.map(r => r.relationType);
+  assert.ok(types.includes('夫妻') || types.includes('×'), '× 与夫妻关系');
+  assert.ok(types.length >= 5, `关系数 ${types.length} ≥ 5`);
+  const ev = parsed.events.map(e => e.title);
+  assert.ok(ev.length >= 2, );
+  assert.ok(ev.some(t => t.includes('相遇') || t.includes('对峙')), '章节小节自动生成事件');
+  const ids = new Set(parsed.persons.map(p => p.id));
+  assert.ok(rels.every(r => ids.has(r.sourceId) && ids.has(r.targetId)), '无孤儿关系');
+});
+
 test('Markdown 叙述句式：方位句/被动式/长句内嵌句式', () => {
   const md = '# 关系\n- **劳拉·曼斯菲尔德(白夫人)**:加百利之妻，目睹丈夫献祭亲生子女。\n- **奥古斯特·纳什**:孤儿→被拉尔夫教唆的"时间旅者"，获救后成家。\n- 尽管莫琳与埃米特本是挚友，她仍怀疑那件事的真相。\n';
   const parsed = DataIO.parseMarkdown(md, '叙述.md');

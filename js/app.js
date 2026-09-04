@@ -1631,16 +1631,19 @@ const App = {
           模板包含「人物信息表」「关系信息表」「时间线事件表」三张表单：<br>
           · 人物信息表必填：<b>人物ID</b>、<b>人物姓名</b>；选填：英文名/别名、头像、简介、标签、性别、年龄、身份职位、归属分组<br>
           · 关系信息表必填：<b>起始人物ID</b>、<b>目标人物ID</b>、<b>关系类型</b>；选填：关系描述、关系强度（1-10）、关系时间、备注<br>
-          · 时间线事件表必填：<b>事件名称</b>；选填：时间/年代、排序序号、时期/篇章、事件说明、关联人物（按姓名）
+          · 时间线事件表必填：<b>事件名称</b>；选填：时间/年代、排序序号、时期/篇章、事件说明、关联人物（按姓名）<br>
+          · <b>Markdown 剧情文档</b>无需表头：用「主要角色」列表、家族树（代码块）、A × B / A ↔ B 恩怨、章节小节即可；叙述句（A与B是恋人）也会自动识别
         </div>`,
       footerHTML: `
         <button class="btn" data-act="csv">CSV 模板</button>
         <button class="btn" data-act="json">JSON 模板</button>
+        <button class="btn primary" data-act="md">Markdown 剧情模板</button>
         <button class="btn primary" data-act="xlsx">Excel 模板（推荐）</button>`
     });
     m.body.parentElement.querySelector('[data-act=xlsx]').onclick = () => { DataIO.downloadTemplate('xlsx'); this.toast('Excel 模板已下载', 'success'); };
     m.body.parentElement.querySelector('[data-act=csv]').onclick = () => { DataIO.downloadTemplate('csv'); this.toast('CSV 模板已下载（两张表）', 'success'); };
     m.body.parentElement.querySelector('[data-act=json]').onclick = () => { DataIO.downloadTemplate('json'); this.toast('JSON 模板已下载', 'success'); };
+    m.body.parentElement.querySelector('[data-act=md]').onclick = () => { DataIO.downloadTemplate('md'); this.toast('Markdown 剧情模板已下载', 'success'); };
   },
 
   /* ============================================================

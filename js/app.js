@@ -60,16 +60,24 @@ const App = {
     const root = document.getElementById('toastRoot');
     const el = document.createElement('div');
     el.className = 'toast ' + (type || 'info');
-    // 配色实时读取当前主题变量并内联，防止第三方样式（浏览器脚本）覆盖导致与主题脱色；
-    // 读取失败时回退 var() 由 CSS 主题变量接管
+    // 配色以画布主题表（JS 单一可信源）为准，CSS 主题块兜底：
+    // 恢复工程等场景中主题可能来自工程文件（含用户自定义主题），CSS 未必有对应规则，
+    // 直接读 CSS 变量会回退浅色；从 Renderer.theme 读取保证提示条总是与画布一致
     const cs = getComputedStyle(document.body);
     const v = (name) => (cs.getPropertyValue(name).trim() || '');
-    if (v('--panel')) {
-      el.style.setProperty('background', v('--panel'), 'important');
-      el.style.setProperty('color', v('--text'), 'important');
-      el.style.setProperty('box-shadow', v('--shadow'), 'important');
-      el.style.setProperty('border-left-color', type === 'error' ? v('--err') : type === 'warn' ? v('--warn') : type === 'success' ? v('--ok') : v('--primary'), 'important');
-    }
+    const paint = () => {
+      const th = Renderer.theme || {};
+      el.style.setProperty('background', th.bg || v('--panel') || '', 'important');
+      el.style.setProperty('color', th.nodeText || v('--text') || '', 'important');
+      el.style.setProperty('box-shadow', '0 6px 24px rgba(0,0,0,.35)', 'important');
+      const accent = type === 'error' ? (v('--err') || '#e5484d')
+        : type === 'warn' ? (v('--warn') || '#f59f24')
+        : type === 'success' ? (v('--ok') || '#22a06b')
+        : (th.primary || v('--primary') || '');
+      el.style.setProperty('border-left-color', accent, 'important');
+    };
+    paint(); // 立即上色
+    requestAnimationFrame(paint); // 下一帧校准（覆盖样式表尚未结算的极端时序）
     el.innerHTML = `<span>${Utils.escapeHtml(text)}</span><span class="t-close">✕</span>`;
     el.querySelector('.t-close').onclick = () => el.remove();
     root.appendChild(el);

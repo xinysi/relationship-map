@@ -1532,6 +1532,8 @@ const DataIO = {
     const w = bbox.w + pad * 2, h = bbox.h + pad * 2;
     const th = Renderer.theme;
     const esc = Utils.escapeHtml;
+    const uiFont = esc(Renderer.uiPreset(Renderer._themeId || 'light').font);
+    const uiStrokeK = Renderer.uiPreset(Renderer._themeId || 'light').stroke / 1.5;
     const f = (v) => (+v).toFixed(2);
     const parts = [];
 
@@ -1673,16 +1675,16 @@ const DataIO = {
       const fill = st.fill || th.nodeFill;
       if (st.shape === 'rect') {
         const rw = r * 1.7, rh = r * 1.3;
-        parts.push(`<rect x="${f(c.x - rw / 2)}" y="${f(c.y - rh / 2)}" width="${f(rw)}" height="${f(rh)}" rx="${f(Math.min(10, r * 0.4))}" fill="${esc(fill)}" stroke="${esc(border)}" stroke-width="${f(Math.max(1.5, r * 0.09))}"/>`);
+        parts.push(`<rect x="${f(c.x - rw / 2)}" y="${f(c.y - rh / 2)}" width="${f(rw)}" height="${f(rh)}" rx="${f(Math.min(10, r * 0.4))}" fill="${esc(fill)}" stroke="${esc(border)}" stroke-width="${f(Math.max(1.5, r * 0.09) * uiStrokeK)}"/>`);
       } else {
-        parts.push(`<circle cx="${f(c.x)}" cy="${f(c.y)}" r="${f(r)}" fill="${esc(fill)}" stroke="${esc(border)}" stroke-width="${f(Math.max(1.5, r * 0.09))}"/>`);
+        parts.push(`<circle cx="${f(c.x)}" cy="${f(c.y)}" r="${f(r)}" fill="${esc(fill)}" stroke="${esc(border)}" stroke-width="${f(Math.max(1.5, r * 0.09) * uiStrokeK)}"/>`);
       }
       const name = p.name || '未命名';
       // 圆内首字（与画布一致：无头像节点在中心绘制名字首字）
       const charFs = Math.max(11, r * 0.75);
-      parts.push(`<text x="${f(c.x)}" y="${f(c.y + charFs * 0.35)}" font-size="${f(charFs)}" font-weight="600" fill="${esc(border)}" opacity="0.75" text-anchor="middle" font-family="Microsoft YaHei, PingFang SC, sans-serif">${esc(name.charAt(0))}</text>`);
+      parts.push(`<text x="${f(c.x)}" y="${f(c.y + charFs * 0.35)}" font-size="${f(charFs)}" font-weight="600" fill="${esc(border)}" opacity="0.75" text-anchor="middle" font-family="${uiFont}">${esc(name.charAt(0))}</text>`);
       const tx = c.x, ty = c.y + r + 3;
-      parts.push(`<text x="${f(tx)}" y="${f(ty + fs * 0.9)}" font-size="${f(fs)}" fill="${esc(st.textColor || th.nodeText)}" text-anchor="middle" font-family="Microsoft YaHei, PingFang SC, sans-serif">${esc(name)}</text>`);
+      parts.push(`<text x="${f(tx)}" y="${f(ty + fs * 0.9)}" font-size="${f(fs)}" fill="${esc(st.textColor || th.nodeText)}" text-anchor="middle" font-family="${uiFont}">${esc(name)}</text>`);
     }
 
     const svg = `<?xml version="1.0" encoding="UTF-8"?>\n` +

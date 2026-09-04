@@ -23,6 +23,7 @@ const App = {
     Renderer.init(document.getElementById('canvas'));
     Renderer.setThemeName(this.currentTheme);
     document.body.dataset.theme = this.currentTheme;
+    document.body.dataset.ui = Renderer.uiPresetKey(this.currentTheme);
 
     this.bindUI();
     this.bindCanvas();
@@ -1806,6 +1807,7 @@ const App = {
       this.currentProjectId = id;
       this.currentTheme = res.theme || this.currentTheme;
       document.body.dataset.theme = this.currentTheme;
+    document.body.dataset.ui = Renderer.uiPresetKey(this.currentTheme);
       Renderer.setThemeName(this.currentTheme);
       ProjectStore.saveSettings({ theme: this.currentTheme });
       ProjectStore.setLastSession({ id, name: pr.name, time: Date.now() });
@@ -1838,6 +1840,7 @@ const App = {
         this.currentProjectId = null;
         this.currentTheme = res.theme || 'light';
         document.body.dataset.theme = this.currentTheme;
+    document.body.dataset.ui = Renderer.uiPresetKey(this.currentTheme);
         Renderer.setThemeName(this.currentTheme);
         this.updateAll();
         this.toast(`工程《${GraphStore.projectName}》已打开`, 'success');
@@ -1911,6 +1914,7 @@ const App = {
       card.onclick = () => {
         this.currentTheme = card.dataset.theme;
         document.body.dataset.theme = this.currentTheme;
+    document.body.dataset.ui = Renderer.uiPresetKey(this.currentTheme);
         Renderer.setThemeName(this.currentTheme);
         ProjectStore.saveSettings({ theme: this.currentTheme });
         GraphStore.dirty = true;

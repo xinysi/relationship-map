@@ -30,6 +30,25 @@ test('60 套主题且名称/分组完整', () => {
   assert.equal(Renderer.THEMES.macaron.group, 'dessert');
 });
 
+test('主题排版预设：8 套且每主题有指派', () => {
+  const PRESET_KEYS = ['clean', 'rounded', 'cute', 'serif', 'tech', 'bold', 'elegant', 'minimal'];
+  assert.equal(Object.keys(Renderer.UI_PRESETS).length, PRESET_KEYS.length);
+  for (const k of PRESET_KEYS) {
+    const p = Renderer.UI_PRESETS[k];
+    assert.ok(p.font && typeof p.radius === 'number' && typeof p.letter === 'number' && typeof p.stroke === 'number', `预设 ${k} 字段完整`);
+  }
+  for (const id of Object.keys(Renderer.THEMES)) {
+    const key = Renderer.uiPresetKey(id);
+    assert.ok(Renderer.UI_PRESETS[key], `主题 ${id} 排版预设有效`);
+    assert.ok(Renderer.uiPreset(id), `主题 ${id} 可解析预设`);
+  }
+  assert.equal(Renderer.uiPresetKey('cyber'), 'tech');
+  assert.equal(Renderer.uiPresetKey('chinese'), 'serif');
+  assert.equal(Renderer.uiPresetKey('macaron'), 'cute');
+  assert.equal(Renderer.uiPresetKey('simple'), 'minimal');
+  assert.equal(Renderer.uiPresetKey('unknown'), 'clean');
+});
+
 test('_highlightCtx：pinned 优先于 hover', () => {
   graph();
   Renderer.hoverPersonId = 'B'; // 假设悬浮 B

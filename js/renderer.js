@@ -82,13 +82,48 @@ const Renderer = {
     winter:   { name: '冬雪', group: 'cool', bg: '#f2f7fb', dot: '#dde9f5', nodeFill: '#ffffff', nodeBorder: '#a6c8e0', nodeText: '#33414f', subText: '#7d93a8', edge: '#d3e2ef', edgeText: '#5b7a95', edgeTextBg: 'rgba(255,255,255,.95)', primary: '#6b9cc4', search: '#e8890c', dimNode: 0.16, dimEdge: 0.07 }
   },
 
+  /* ---------- 主题排版预设（字体 / 圆角 / 字距 / 节点描边），按主题风格指派 ---------- */
+  UI_PRESETS: {
+    clean:    { font: '"Microsoft YaHei","PingFang SC","Segoe UI",sans-serif', radius: 8,  radiusSm: 6,  letter: 0,   stroke: 1.5 },
+    rounded:  { font: '"幼圆","YouYuan","Varela Round","Microsoft YaHei",sans-serif', radius: 16, radiusSm: 10, letter: .4, stroke: 1.5 },
+    cute:     { font: '"幼圆","YouYuan","Varela Round","Microsoft YaHei",sans-serif', radius: 20, radiusSm: 12, letter: 1,   stroke: 1.8 },
+    serif:    { font: '"宋体","SimSun","Songti SC",serif', radius: 4,  radiusSm: 2,  letter: .6, stroke: 1.8 },
+    tech:     { font: '"Microsoft YaHei","PingFang SC","Segoe UI",sans-serif', radius: 5,  radiusSm: 3,  letter: -.3, stroke: 2.2 },
+    bold:     { font: '"Microsoft YaHei","PingFang SC","Segoe UI",sans-serif', radius: 2,  radiusSm: 1,  letter: -.2, stroke: 2.6 },
+    elegant:  { font: '"Microsoft YaHei","PingFang SC","Segoe UI",sans-serif', radius: 8,  radiusSm: 5,  letter: .3,  stroke: 1.8 },
+    minimal:  { font: '"Microsoft YaHei","PingFang SC","Segoe UI",sans-serif', radius: 0,  radiusSm: 0,  letter: 0,   stroke: 1.2 }
+  },
+  _uiMap: {
+    light: 'clean', dark: 'clean', simple: 'minimal', business: 'elegant',
+    forest: 'rounded', mint: 'rounded', sage: 'rounded', lime: 'cute',
+    pine: 'tech', emerald: 'rounded', lagoon: 'tech', velvet: 'rounded',
+    sunset: 'clean', sun: 'cute', coffee: 'elegant', fire: 'bold', coral: 'cute',
+    terracotta: 'clean', amber: 'elegant', champagne: 'elegant',
+    ocean: 'clean', sky: 'clean', navy: 'bold', cobalt: 'tech', indigo: 'clean',
+    graphite: 'tech', ink: 'tech', obsidian: 'tech',
+    sakura: 'rounded', violet: 'rounded', lavender: 'rounded', night: 'tech', rose: 'rounded',
+    plum: 'rounded', wine: 'elegant', fuchsia: 'cute', royal: 'tech',
+    flame: 'elegant', ember: 'bold', gold: 'elegant',
+    retro: 'rounded', vintage: 'serif', pixel: 'bold',
+    sweetcool: 'cute', y2k: 'tech', pop: 'bold', graffiti: 'bold',
+    chinese: 'serif', inkwash: 'serif',
+    macaron: 'cute', candy: 'cute', lemonade: 'cute',
+    cyber: 'tech', crt: 'tech', firefly: 'rounded',
+    gothic: 'bold',
+    matcha: 'rounded', beach: 'clean', autumn: 'elegant', winter: 'minimal'
+  },
+
   init(canvas) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.theme = this.THEMES.light;
+    this._themeId = 'light';
     this.resize();
     Utils.emitter.on('graph:change', () => { this._parallelDirty = true; this._pruneAvatarCache(); this.requestDraw(); });
   },
+
+  uiPresetKey(id) { return this._uiMap[id] || 'clean'; },
+  uiPreset(id) { return this.UI_PRESETS[this.uiPresetKey(id)]; },
 
   /* 人物删除后清理头像缓存，避免缓存无限增长 */
   _pruneAvatarCache() {
@@ -99,6 +134,7 @@ const Renderer = {
 
   setThemeName(name) {
     this.theme = this.THEMES[name] || this.THEMES.light;
+    this._themeId = name in this.THEMES ? name : 'light';
     this.requestDraw();
   },
 
@@ -268,6 +304,7 @@ const Renderer = {
   drawScene(ctx, view, w, h, opts) {
     opts = opts || {};
     const th = this.theme;
+    const ui = this.uiPreset(this._themeId);
     const scale = view.scale;
     // 导出时文字/线宽随倍率同步放大，避免导出图放大查看时文字发糊（屏幕渲染保持固定字号）
     const fs = opts.forExport ? scale : 1;
@@ -414,7 +451,7 @@ const Renderer = {
     }
     ctx.setLineDash([]);
     ctx.globalAlpha = 1;
-    ctx.font = (11 * fs) + 'px "Microsoft YaHei", sans-serif';
+    ctx.font = (11 * fs) + 'px ' + ui.font;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     for (const lb of edgeLabelList) {
       const tw = ctx.measureText(lb.text).width;
@@ -429,7 +466,7 @@ const Renderer = {
     }
 
     /* ----- 人物节点 ----- */
-    const fontLabel = `${this.options.labelSize * fs}px "Microsoft YaHei", sans-serif`;
+    const fontLabel = `${this.options.labelSize * fs}px ${ui.font}`;
     // 大规模数据 + 低缩放时隐藏姓名标签，保证交互流畅（悬浮/选中仍显示）
     const hideLabels = !opts.forExport && scale < 0.6 && GraphStore.persons.length > 500;
     for (const p of GraphStore.persons) {
@@ -491,7 +528,7 @@ const Renderer = {
       ctx.fill();
       ctx.shadowBlur = 0;
       ctx.strokeStyle = borderColor;
-      ctx.lineWidth = Math.max(1.5, rWorld * 0.09) * (isHover ? 1.4 : 1) * fs;
+      ctx.lineWidth = Math.max(1.5, rWorld * 0.09) * (isHover ? 1.4 : 1) * fs * (ui.stroke / 1.5);
       ctx.stroke();
 
       // 头像或首字
@@ -510,7 +547,7 @@ const Renderer = {
       } else {
         ctx.fillStyle = borderColor;
         ctx.globalAlpha = alpha * 0.75;
-        ctx.font = `600 ${Math.max(11, r * 0.75)}px "Microsoft YaHei", sans-serif`;
+        ctx.font = `600 ${Math.max(11, r * 0.75)}px ${ui.font}`;
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText((p.name || '?').charAt(0), X, Y + 1);
         ctx.globalAlpha = alpha;

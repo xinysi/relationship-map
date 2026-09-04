@@ -311,6 +311,31 @@ const Renderer = {
      场景绘制（实时画布与导出共用）
      opts: { transparent, noAvatar, noCull, forExport }
      ============================================================ */
+  /* 节点轮廓路径（形状随主题版式：circle/rect/hex/diamond；r 为屏幕半径）。
+     主体、光圈、双线内圈共用，保证选中/悬浮外框永远与节点形状一致 */
+  _nodePath(ctx, X, Y, r, shape) {
+    ctx.beginPath();
+    if (shape === 'rect') {
+      const rw = r * 1.7, rh = r * 1.3;
+      if (ctx.roundRect) ctx.roundRect(X - rw / 2, Y - rh / 2, rw, rh, Math.min(10, r * 0.4));
+      else ctx.rect(X - rw / 2, Y - rh / 2, rw, rh);
+    } else if (shape === 'hex') {
+      const k = r * 1.15;
+      for (let i = 0; i < 6; i++) {
+        const a = Math.PI / 3 * i + Math.PI / 6;
+        const px = X + Math.cos(a) * k, py = Y + Math.sin(a) * k;
+        if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py);
+      }
+      ctx.closePath();
+    } else if (shape === 'diamond') {
+      const k = r * 1.3;
+      ctx.moveTo(X, Y - k); ctx.lineTo(X + k, Y); ctx.lineTo(X, Y + k); ctx.lineTo(X - k, Y);
+      ctx.closePath();
+    } else {
+      ctx.arc(X, Y, r, 0, Math.PI * 2);
+    }
+  },
+
   drawScene(ctx, view, w, h, opts) {
     opts = opts || {};
     const th = this.theme;
@@ -524,57 +549,37 @@ const Renderer = {
 
       const st = p.style || {};
       const rWorld = this.nodeRadius(p);
+      const shape = st.shape || layout.shape;
       const borderColor = st.border || (this.options.colorByGroup && p.group ? Utils.colorForGroup(p.group) : th.nodeBorder);
       const fill = st.fill || th.nodeFill;
 
-      // 选中 / 搜索 / 事件聚焦光圈
+      // 选中 / 搜索 / 事件聚焦光圈（形状跟随节点）
       if (isSelected) {
-        ctx.beginPath();
+        this._nodePath(ctx, X, Y, r + 4.5 * fs, shape);
         ctx.strokeStyle = th.primary;
         ctx.lineWidth = 2.5 * fs;
-        ctx.arc(X, Y, r + 4.5 * fs, 0, Math.PI * 2);
         ctx.stroke();
         ctx.globalAlpha = alpha * 0.25;
-        ctx.beginPath(); ctx.fillStyle = th.primary; ctx.arc(X, Y, r + 9 * fs, 0, Math.PI * 2); ctx.fill();
+        this._nodePath(ctx, X, Y, r + 9 * fs, shape);
+        ctx.fillStyle = th.primary;
+        ctx.fill();
         ctx.globalAlpha = alpha;
       } else if (isHL) {
-        ctx.beginPath();
+        this._nodePath(ctx, X, Y, r + 5.5 * fs, shape);
         ctx.strokeStyle = th.search;
         ctx.lineWidth = 2.5 * fs;
-        ctx.arc(X, Y, r + 5.5 * fs, 0, Math.PI * 2);
         ctx.stroke();
       } else if (isSearch) {
-        ctx.beginPath();
+        this._nodePath(ctx, X, Y, r + 4.5 * fs, shape);
         ctx.strokeStyle = th.search;
         ctx.lineWidth = 2 * fs;
         ctx.setLineDash([4 * fs, 3 * fs]);
-        ctx.arc(X, Y, r + 4.5 * fs, 0, Math.PI * 2);
         ctx.stroke();
         ctx.setLineDash([]);
       }
 
       // 节点主体（形状：主题版式缺省，节点自定义 style.shape 优先）
-      const shape = st.shape || layout.shape;
-      ctx.beginPath();
-      if (shape === 'rect') {
-        const rw = r * 1.7, rh = r * 1.3;
-        if (ctx.roundRect) ctx.roundRect(X - rw / 2, Y - rh / 2, rw, rh, Math.min(10, r * 0.4));
-        else ctx.rect(X - rw / 2, Y - rh / 2, rw, rh);
-      } else if (shape === 'hex') {
-        const k = r * 1.15;
-        for (let i = 0; i < 6; i++) {
-          const a = Math.PI / 3 * i + Math.PI / 6;
-          const px = X + Math.cos(a) * k, py = Y + Math.sin(a) * k;
-          if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py);
-        }
-        ctx.closePath();
-      } else if (shape === 'diamond') {
-        const k = r * 1.3;
-        ctx.moveTo(X, Y - k); ctx.lineTo(X + k, Y); ctx.lineTo(X, Y + k); ctx.lineTo(X - k, Y);
-        ctx.closePath();
-      } else {
-        ctx.arc(X, Y, r, 0, Math.PI * 2);
-      }
+      this._nodePath(ctx, X, Y, r, shape);
       ctx.fillStyle = fill;
       // 主题光效：soft 柔影 / glow 霓虹发光（深色主题）/ double 复古双线
       if (isHover || isSelected) { ctx.shadowColor = 'rgba(63,126,247,.45)'; ctx.shadowBlur = 12 * fs; }
@@ -586,10 +591,9 @@ const Renderer = {
       ctx.lineWidth = Math.max(1.5, rWorld * 0.09) * (isHover ? 1.4 : 1) * fs;
       ctx.stroke();
       if (layout.fx === 'double') {
-        ctx.beginPath();
+        this._nodePath(ctx, X, Y, Math.max(2, r * 0.74), shape);
         ctx.strokeStyle = th.bg;
         ctx.lineWidth = 1.3 * fs;
-        ctx.arc(X, Y, Math.max(2, r * 0.74), 0, Math.PI * 2);
         ctx.stroke();
       }
 

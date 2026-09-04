@@ -2220,7 +2220,7 @@ const App = {
       const mask = document.createElement('div');
       mask.className = 'guide-mask';
       const s = steps[idx];
-      mask.innerHTML = `
+      mask.innerHTML = I18n.trHtml(`
         <div class="guide-card">
           <div class="g-emoji">${s.emoji}</div>
           <div class="g-step">新手引导 ${idx + 1} / ${steps.length}</div>
@@ -2231,7 +2231,7 @@ const App = {
             <div class="guide-dots">${steps.map((_, i) => `<span class="${i === idx ? 'on' : ''}"></span>`).join('')}</div>
             <button class="btn primary sm" data-act="next">${idx === steps.length - 1 ? '开始使用' : '下一步'}</button>
           </div>
-        </div>`;
+        </div>`);
       document.body.appendChild(mask);
       mask.querySelector('.guide-skip').onclick = finish;
       mask.querySelector('[data-act=next]').onclick = () => {

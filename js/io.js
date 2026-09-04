@@ -1401,6 +1401,7 @@ const DataIO = {
       夫妻: 9, 恋人: 8, 父子: 9, 父女: 9, 母子: 9, 母女: 9, 亲子: 9,
       兄弟: 8, 姐妹: 8, 兄妹: 8, 龙凤胎: 9, 双胞胎: 9, 祖孙: 8, 养子: 7, 养兄妹: 7,
       师徒: 7, 同窗: 6, 君臣: 7, 主仆: 6, 对手: 6, 敌对: 7, 联手: 6, 救赎: 6,
+      挚友: 6, 好友: 5, 朋友: 4, 仇人: 7, 死对头: 7, 闺蜜: 5, 盟友: 6, 搭档: 6, 同学: 5, 同事: 5, 结拜: 7, 未婚夫妻: 8, 亲戚: 4,
       亲属: 5, 创造: 6, 依附: 4
     };
     const STRONG_TEXT = /宿敌|死敌|世仇|决裂|至爱|深爱|至死不渝|生死之交|莫逆|挚友|恨/;
@@ -1432,7 +1433,7 @@ const DataIO = {
         结识: '同窗', 初遇: '同窗', 邂逅: '同窗'
       };
       const verbs = Object.keys(verb2type).sort((a, b) => b.length - a.length);
-      const cleanN = (s2) => stripMetaParens(cleanText(s2)).replace(/[“”"「」『』]/g, '').trim();
+      const cleanN = (s2) => stripMetaParens(cleanText(s2)).replace(/[“”"「」『』]/g, '').replace(/[（(][^）)]*[）)]\s*$/, '').trim();
       const checkName = (n2) => {
         n2 = cleanN(n2);
         if (!n2 || n2.length < 2 || n2.length > 10) return null;
@@ -1443,7 +1444,26 @@ const DataIO = {
       const getByName = (n2, strict) => {
         const c = cleanN(n2);
         if (knownNames.has(c)) return findOrCreate(c, {});
-        if (strict) return null;
+        // 简称匹配：首段相等或全名包含简称（最长段相等优先；多候选且长度接近视为歧义，放弃）
+        let best = null, segHits = [];
+        for (const k of knownNames) {
+          const seg = k.split('·')[0];
+          if (seg === c) segHits.push(k);
+          else if (c.length >= 2 && k.includes(c)) segHits.push(k);
+        }
+        if (segHits.length === 1) return findOrCreate(segHits[0], {});
+        if (segHits.length > 1) {
+          segHits.sort((a, b) => a.length - b.length);
+          if (segHits.length === 2 && segHits[0].length <= segHits[1].length - 3) return findOrCreate(segHits[0], {});
+          return null; // 歧义（老/小加百利、格雷等），不猜测
+        }
+        if (strict) {
+          // 前导状语剥离重试（「尽管莫琳与埃米特本是挚友」中的「尽管」）
+          for (let cut = 1; cut <= Math.min(4, c.length - 2); cut++) {
+            const sub = c.slice(cut);
+            if (knownNames.has(sub)) return findOrCreate(sub, {});
+          }
+        }
         const ok = checkName(c);
         return ok ? findOrCreate(ok, {}) : null;
       };
@@ -1458,19 +1478,93 @@ const DataIO = {
       const strict = knownNames.size > 0;
       const relRe = new RegExp('^([^\\s，,。；;！!？?：:]{1,16}?)(?:与|和|跟|同)([^\\s，,。；;！!？?：:]{1,16}?)(?:是|为|皆为|互为|成了|成为|结为|结成|是一对)?(' + relWordList.join('|') + ')(?:关系|一对|两家)?(?:[。；;！!？?，,]|$)');
       const verbRe = new RegExp('^([^\\s，,。；;！!？?：:]{1,16}?)(?:' + verbs.map(v => v + '(?:了)?').join('|') + ')([^\\s，,。；;！!？?：:]{1,16}?)(?:[。；;！!？?，,]|$)');
+      // 方位句：「A:…B之妻/之妹/之母…」（A 是 B 的 X）与「…P的恋人…」前置式
+      const POS_WORD2TYPE = {
+        之母: '亲子', 之父: '亲子', 之妻: '夫妻', 之夫: '夫妻', 之女: '亲子', 之子: '亲子',
+        之妹: '姐妹', 之姐: '姐妹', 之弟: '兄弟', 之兄: '兄弟',
+        之养女: '养子', 之养子: '养子', 之侄女: '亲属', 之侄: '亲属',
+        之孙: '祖孙', 之孙女: '祖孙', 之曾祖: '祖孙', 之祖母: '祖孙', 之祖父: '祖孙',
+        之继女: '养子', 之继子: '养子', 之曾孙: '祖孙'
+      };
+      const relReSub = new RegExp('(?:^|[，。；;：:])' + '([^\\s，,。；;！!？?：:]{1,16}?)(?:与|和|跟|同)([^\\s，,。；;！!？?：:]{1,16}?)(?:是|为|皆为|互为|成了|成为|结为|结成|是一对)?(' + relWordList.join('|') + ')(?:关系|一对|两家)?(?=[，。；;！!？?、]|$)');
+      const verbReSub = new RegExp('(?:^|[，。；;：:])' + '([^\\s，,。；;！!？?：:]{1,16}?)(?:' + verbs.map(v => v + '(?:了)?').join('|') + ')([^\\s，,。；;！!？?：:]{1,16}?)(?=[，。；;！!？?、]|$)');
+      const posKe = Object.keys(POS_WORD2TYPE).sort((a, b) => b.length - a.length);
+      const posRe = new RegExp('^([^\\s，,。；;！!？?：:]{1,24}?)[：:]([^\\s。；;！!？?：:]{0,30}?)(' + posKe.join('|') + ')(?:[，。；;！!？?、]|$)');
+      const posLooseRe = new RegExp('([\\u4e00-\\u9fa5·]{2,16}?)(?:的)(恋人|挚友|闺蜜|未婚妻|未婚夫|妻子|丈夫|女儿|儿子|母亲|父亲|妹妹|姐姐|弟弟|哥哥|盟友|远亲|族亲|后裔)(?:[，。；;！!？?、]|$)');
+      const POS_LOOSE2TYPE = { 恋人: '恋人', 挚友: '同窗', 闺蜜: '姐妹', 未婚妻: '夫妻', 未婚夫: '夫妻', 妻子: '夫妻', 丈夫: '夫妻', 女儿: '亲子', 儿子: '亲子', 母亲: '亲子', 父亲: '亲子', 妹妹: '姐妹', 姐姐: '姐妹', 弟弟: '兄弟', 哥哥: '兄弟', 盟友: '联手', 远亲: '亲属', 族亲: '亲属', 后裔: '亲属' };
+      const PAS_S2TYPE = {
+        教唆: '敌对', 杀害: '敌对', 绑架: '敌对', 欺骗: '敌对', 陷害: '敌对', 囚禁: '敌对',
+        驱逐: '敌对', 抛弃: '敌对', 利用: '敌对', 操纵: '敌对', 附身: '依附', 夺舍: '依附',
+        拯救: '救赎', 营救: '救赎', 收养: '养子', 抚养: '养子', 收留: '养子'
+      };
+      const pasRe = new RegExp('被([\\u4e00-\\u9fa5·A-Za-z]{2,12}?)(?:所)?(' + Object.keys(PAS_S2TYPE).sort((a, b) => b.length - a.length).map(v => v + '(?:了)?').join('|') + ')');
+      const addDir = (fromRaw, toRaw, type, strict2) => {
+        // fromRaw 是"之X"句中的 C（关系的所属人），toRaw 是句中主体人物
+        const a = getByName(fromRaw, strict2), b = getByName(toRaw, strict2);
+        if (!a || !b || a.id === b.id) return;
+        const key = [a.id, b.id].sort().join('|') + '|' + type;
+        if (list.some(r => r.sourceId !== r.targetId && [r.sourceId, r.targetId].sort().join('|') + '|' + r.relationType === key)) return;
+        list.push({ sourceId: a.id, targetId: b.id, relationType: type, desc: fromRaw + (type === '夫妻' ? '的伴侣' : '的亲属'), strength: 0, time: '' });
+      };
       let codeOn = false;
       for (const rawLine of lines) {
-        const line = stripMd(rawLine).trim();
+        let line = stripMd(rawLine).trim();
         if (/^```/.test(line)) { codeOn = !codeOn; continue; }
-        if (codeOn || !line || line.length > 60) continue;
-        if (/^[#|>!*\-]|^[0-9]+[.、]/.test(line)) continue;
-        let m = relRe.exec(line);
+        if (codeOn || !line) continue;
+        if (/^[#|>!]/.test(line)) continue;
+        // 列表项（- **人物**: …）剥离前缀后参与句式分析，总览类文档人物段落大多如此
+        line = line.replace(/^[-*·•]+[ \t]+/, '').replace(/^\d+[.、]\s*/, '');
+        if (!line || line.length > 160) continue;
+        // 整行锚定的句式仅用于短行（≤60）；方位/前置/被动为子串模式，长行也可命中
+        const isLong = line.length > 60;
+        let m = isLong ? null : relRe.exec(line);
         if (m) { addNarr(m[1], m[2], m[3], strict); continue; }
-        const m2 = verbRe.exec(line);
+        const m2 = isLong ? null : verbRe.exec(line);
         if (m2) {
           const seg = line.slice(m2[1].length);
           const v = verbs.find(vv => seg.indexOf(vv) === 0);
           if (v) addNarr(m2[1], m2[2], verb2type[v], strict);
+          continue;
+        }
+        // 子串叙述句（仅熟人模式）：「……A与B是恋人……」「……A杀死了B……」与「……少年时同窗……」
+        if (strict) {
+          const ms = relReSub.exec(line);
+          if (ms) { addNarr(ms[1], ms[2], ms[3], strict); continue; }
+          const ms2 = verbReSub.exec(line);
+          if (ms2) {
+            const seg = line.slice(ms2.index + ms2[1].length);
+            const v = verbs.find(vv => seg.indexOf(vv) === 0);
+            if (v) addNarr(ms2[1], ms2[2], verb2type[v], strict);
+            continue;
+          }
+        }
+        // 方位句：行首为人物 A，句中"B之X" → A 与 B 的关系
+        let head = null;
+        const ci = line.search(/[：:]/);
+        if (ci > 0) { const hr = line.slice(0, ci).replace(/^[*s]+|[*s]+$/g, ''); if (/[一-龥]/.test(hr)) head = cleanN(hr); }
+        const mp = posRe.exec(line);
+        if (mp) {
+          const type = POS_WORD2TYPE[mp[3]];
+          const headName = cleanN(mp[1]);
+          if (headName) {
+            for (const nm of mp[2].split(/[、，,]/)) {
+              const nn = cleanN(nm);
+              if (nn) addDir(nn, headName, type, false);
+            }
+          }
+          continue;
+        }
+        // 前置式：「P的恋人 / 盟友…」——行首人物 A 是 P 的 X，与 P 建立关系
+        const ml2 = posLooseRe.exec(line);
+        if (ml2 && head) {
+          addDir(ml2[1], head, POS_LOOSE2TYPE[ml2[2]], false);
+          continue;
+        }
+        // 被动式：被 P 教唆/绑架… → P 与行首人物的关系
+        const mp2 = pasRe.exec(line);
+        if (mp2 && !this) console.log(JSON.stringify({head, l: line.slice(0,42), m: mp2.slice(0,3)}));
+        if (mp2) {
+          if (head) addNarr(mp2[1], head, PAS_S2TYPE[mp2[2]] || '敌对', false);
         }
       }
     };

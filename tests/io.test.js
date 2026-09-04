@@ -26,6 +26,22 @@ test('parseCSVText：引号/转义/分隔符', () => {
   assert.deepEqual(Array.from(rows[1]), ['x,y', 'z', 'q"q']);
 });
 
+test('Markdown 叙述句式：方位句/被动式/长句内嵌句式', () => {
+  const md = '# 关系\n- **劳拉·曼斯菲尔德(白夫人)**:加百利之妻，目睹丈夫献祭亲生子女。\n- **奥古斯特·纳什**:孤儿→被拉尔夫教唆的"时间旅者"，获救后成家。\n- 尽管莫琳与埃米特本是挚友，她仍怀疑那件事的真相。\n';
+  const parsed = DataIO.parseMarkdown(md, '叙述.md');
+  const names = parsed.persons.map(p => p.name);
+  const rels = parsed.relations;
+  const has = (a, b, t) => rels.some(r => {
+    const sa = parsed.persons.find(p => p.id === r.sourceId)?.name || '';
+    const ta = parsed.persons.find(p => p.id === r.targetId)?.name || '';
+    const ok = (x, y) => x.startsWith(y) || y.startsWith(x) || x.includes(y) || y.includes(x);
+    return ((ok(sa, a) && ok(ta, b)) || (ok(sa, b) && ok(ta, a))) && r.relationType === t;
+  });
+  assert.ok(has('加百利', '劳拉·曼斯菲尔德', '夫妻'), '方位句：加百利之妻 → 夫妻');
+  assert.ok(has('拉尔夫', '奥古斯特·纳什', '敌对'), '被动式：被拉尔夫教唆 → 敌对');
+  assert.ok(has('莫琳', '埃米特', '挚友'), '长句内嵌：莫琳与埃米特本是挚友');
+});
+
 test('Markdown 叙述句式：与/和关系词 + 动词句式抽取', () => {
   const md = '# 角色\n法帅与安娜是恋人\n安多恩格雅杀死了格里格\n格里格与安娜互为仇人\n玛丽和露西是同窗\n';
   const parsed = DataIO.parseMarkdown(md, '叙述.md');

@@ -15,14 +15,19 @@ function graph() {
   GraphStore.reindex();
 }
 
-test('40 套主题且名称完整', () => {
+test('60 套主题且名称/分组完整', () => {
   const keys = Object.keys(Renderer.THEMES);
-  assert.equal(keys.length, 40);
-  for (const k of keys) assert.ok(Renderer.THEMES[k].name, `主题 ${k} 有名称`);
+  assert.equal(keys.length, 60);
+  for (const k of keys) {
+    assert.ok(Renderer.THEMES[k].name, `主题 ${k} 有名称`);
+    assert.ok(Renderer.THEMES[k].group, `主题 ${k} 有分组`);
+  }
   assert.equal(Renderer.THEMES.violet.name, '罗兰紫');
   assert.equal(Renderer.THEMES.mint.name, '薄荷青');
   assert.equal(Renderer.THEMES.night.name, '星夜紫');
   assert.equal(Renderer.THEMES.coral.name, '珊瑚橘');
+  assert.equal(Renderer.THEMES.cyber.name, '赛博');
+  assert.equal(Renderer.THEMES.macaron.group, 'dessert');
 });
 
 test('_highlightCtx：pinned 优先于 hover', () => {

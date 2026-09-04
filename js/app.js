@@ -1885,20 +1885,28 @@ const App = {
      主题 / 全局样式 / 设置
      ============================================================ */
   openThemesModal() {
-    // 主题列表直接从画布主题表派生（THEMES 带 name），新增主题只需改 Renderer.THEMES 一处
-    const themes = Object.entries(Renderer.THEMES).map(([id, t]) => ({ id, name: t.name || id, bg: t.bg, dot: t.primary }));
-    const m = this.openModal({
-      title: '主题切换',
-      bodyHTML: `<div class="theme-grid">${themes.map(t => `
-        <div class="theme-card ${this.currentTheme === t.id ? 'active' : ''}" data-theme="${t.id}">
+    // 主题列表直接从画布主题表派生（THEMES 带 name/group），新增主题只需改 Renderer.THEMES 一处
+    const GROUP_ORDER = [['classic', '经典'], ['nature', '自然'], ['warm', '暖阳'], ['cool', '冷调'],
+      ['pink', '粉紫'], ['redgold', '炽金'], ['retro', '复古'], ['trendy', '潮流'],
+      ['chinese', '国风'], ['dessert', '甜品'], ['scifi', '科幻'], ['gothic', '暗黑']];
+    const entries = Object.entries(Renderer.THEMES);
+    const cardHTML = (id, t) => `
+        <div class="theme-card ${this.currentTheme === id ? 'active' : ''}" data-theme="${id}">
           <div class="theme-preview" style="background:${t.bg}">
-            <i style="width:16px;height:16px;background:${t.dot};left:22%;top:38%"></i>
-            <i style="width:12px;height:12px;background:${t.dot};left:52%;top:22%;opacity:.7"></i>
-            <i style="width:14px;height:14px;background:${t.dot};left:64%;top:55%;opacity:.8"></i>
+            <i style="width:16px;height:16px;background:${t.primary};left:22%;top:38%"></i>
+            <i style="width:12px;height:12px;background:${t.primary};left:52%;top:22%;opacity:.7"></i>
+            <i style="width:14px;height:14px;background:${t.primary};left:64%;top:55%;opacity:.8"></i>
           </div>
           <div class="t-name">${t.name}</div>
-        </div>`).join('')}</div>`
-    });
+        </div>`;
+    const bodyHTML = GROUP_ORDER.map(([gid, gname]) => {
+      const items = entries.filter(([id, t]) => (t.group || 'classic') === gid);
+      if (!items.length) return '';
+      return `<div class="theme-group"><div class="theme-group-title">${gname}</div>
+        <div class="theme-grid">${items.map(([id, t]) => cardHTML(id, t)).join('')}</div></div>`;
+    }).join('');
+    const names = Object.fromEntries(entries);
+    const m = this.openModal({ title: '主题切换', bodyHTML });
     m.body.querySelectorAll('.theme-card').forEach(card => {
       card.onclick = () => {
         this.currentTheme = card.dataset.theme;
@@ -1907,7 +1915,7 @@ const App = {
         ProjectStore.saveSettings({ theme: this.currentTheme });
         GraphStore.dirty = true;
         m.close();
-        this.toast(`已切换至${themes.find(t => t.id === this.currentTheme).name}`, 'success');
+        this.toast(`已切换至${names[this.currentTheme].name}`, 'success');
       };
     });
   },

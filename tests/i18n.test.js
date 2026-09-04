@@ -42,6 +42,14 @@ test('I18n：trHtml 翻译文本节点与属性，未收录词条保留', () => 
   assert.equal(I18n.trHtml(html), html);
 });
 
+test('I18n：tr 前缀剥离与 emoji 剥离', () => {
+  I18n.setLang('en');
+  assert.equal(I18n.tr('· 支持一键导入 Excel / CSV / JSON 自动生成关系网'), 'One-click import of Excel / CSV / JSON to auto-build the web');
+  assert.equal(I18n.tr('📤 只读分享页（单文件 HTML）'), 'Read-only Share Page (HTML)');
+  assert.equal(I18n.tr('恢复工程'), 'Recover Project');
+  I18n.setLang('zh');
+});
+
 test('I18n：字典结构完整（每个词条有英文值）', () => {
   const en = I18n.dict.en;
   assert.ok(en && Object.keys(en).length > 100, `词条数量 ${Object.keys(en).length} 应超过 100`);

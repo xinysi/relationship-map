@@ -42,7 +42,10 @@ const App = {
       const proj = await ProjectStore.getProject(last.id);
       if (proj && proj.data) {
         const ok = await this.confirm({
-          title: '恢复工程', message: `检测到上次未正常关闭的工程《${proj.name}》，是否恢复？`,
+          title: '恢复工程',
+          message: I18n.lang === 'en'
+            ? `An abnormally closed project was detected: "${proj.name}". Restore it?`
+            : `检测到上次未正常关闭的工程《${proj.name}》，是否恢复？`,
           okText: '恢复', cancelText: '新建空白工程'
         });
         if (ok) { this.loadProjectById(last.id); return; }
@@ -1869,7 +1872,9 @@ const App = {
       ProjectStore.setLastSession({ id, name: pr.name, time: Date.now() });
       this.updateAll();
       Renderer.requestDraw();
-      this.toast(`工程《${pr.name}》已打开，编辑状态已恢复`, 'success');
+      this.toast(I18n.lang === 'en'
+        ? `Project "${pr.name}" opened, state restored`
+        : `工程《${pr.name}》已打开，编辑状态已恢复`, 'success');
     } catch (e) {
       this.toast(DataIO.MSG.PROJECT_BROKEN, 'error');
     }

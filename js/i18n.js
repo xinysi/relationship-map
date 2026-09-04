@@ -546,6 +546,14 @@ const I18n = {
       '没有可撤销的操作': 'Nothing to undo',
       '已重做': 'Redone',
       '没有可重做的操作': 'Nothing to redo',
+      '恢复工程': 'Recover Project',
+      '滚轮': 'Wheel',
+      '鼠标左键拖拽空白处': 'Left-drag empty space',
+      '双击节点 / 关系线': 'Double-click node / edge',
+      '双击画布空白处': 'Double-click canvas',
+      '鼠标悬浮': 'Hover mouse',
+      '右键': 'Right-click',
+      '拖拽空白处': 'drag empty space',
       'PNG 图片': 'PNG Image',
       'JPG 图片': 'JPG Image',
       '透明底 PNG': 'Transparent PNG',
@@ -645,6 +653,9 @@ const I18n = {
     // 去除首尾 emoji/空白后再精确查（如「📤 只读分享页（单文件 HTML）」）
     const stripped = String(text).replace(/^[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\s]+|[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\s]+$/gu, '').trim();
     if (stripped && stripped !== text && stripped in this.dict.en) return this.dict.en[stripped];
+    // 剥离列表前缀后再精确查（如「· 支持一键导入 Excel / CSV / JSON 自动生成关系网」）
+    const prefixStripped = stripped.replace(/^[\u00b7\u2022*\u2013\u2014\-\u30fb\s]+/, '').trim();
+    if (prefixStripped && prefixStripped !== stripped && prefixStripped in this.dict.en) return this.dict.en[prefixStripped];
     // 数字/符号与中文混排：按连续中文段分段查表，未收录段保持原文
     return String(text).split(/([\u4e00-\u9fff]+)/).map(seg =>
       (seg in this.dict.en ? this.dict.en[seg] : seg)

@@ -2058,6 +2058,43 @@ const DataIO = {
   },
 
   /* ============================================================
+     主题导入/导出（自定义主题 JSON，供用户间分享）
+     ============================================================ */
+  serializeThemes(ids) {
+    const list = ids && ids.length ? ids.map(id => Renderer.THEMES[id]).filter(Boolean)
+      : Object.values(Renderer.THEMES);
+    return JSON.stringify({ app: 'rgxw-theme', version: 1, themes: list }, null, 2);
+  },
+
+  parseThemeFile(text) {
+    let obj;
+    try { obj = JSON.parse(text); } catch (e) { return { error: 'JSON 解析失败，请确认文件内容完整' }; }
+    const list = Array.isArray(obj) ? obj : (obj && Array.isArray(obj.themes) ? obj.themes : null);
+    if (!list) return { error: '未找到 themes 数组（应为 rgxw-theme 导出文件）' };
+    const HEX = /^#[0-9a-fA-F]{3,8}$/;
+    const ok = [], bad = [];
+    for (const t of list) {
+      const e = this.validateTheme(t);
+      if (e) bad.push(`${t && t.name ? t.name : '?'}：${e}`);
+      else ok.push(t);
+    }
+    return { ok, bad };
+  },
+
+  validateTheme(t) {
+    const HEX = /^#[0-9a-fA-F]{3,8}$/;
+    if (!t || typeof t !== 'object') return '主题为空';
+    const id = String(t.id || '');
+    if (!/^[a-z0-9]{1,24}$/.test(id)) return 'ID 需为 1-24 位小写字母/数字（如 mytheme01）';
+    const name = String(t.name || '').trim();
+    if (!name || name.length > 30) return '名称需为 1-30 字符';
+    for (const k of ['bg', 'nodeFill', 'nodeBorder', 'nodeText', 'subText', 'edge', 'edgeText', 'primary', 'search']) {
+      if (!HEX.test(String(t[k] || ''))) return `字段 ${k} 需为 #RRGGBB 颜色`;
+    }
+    return null;
+  },
+
+  /* ============================================================
      工程文件（.rgxw / .rgxw.json，支持自定义密码加密）
      ============================================================ */
   buildProjectData() {

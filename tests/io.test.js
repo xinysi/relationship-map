@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { load } = require('./helpers/load.js');
 
-const { GraphStore, DataIO } = load();
+const { GraphStore, DataIO, Renderer } = load();
 const FIXTURE = path.join(__dirname, 'fixtures', 'story.md');
 const mdFile = () => new File([fs.readFileSync(FIXTURE, 'utf8')], 'story.md', { type: 'text/markdown' });
 
@@ -24,6 +24,24 @@ test('parseCSVText：引号/转义/分隔符', () => {
   assert.equal(rows.length, 2);
   // Array.from 转为宿主 realm 数组（沙箱数组原型不同，deepStrictEqual 会比较原型）
   assert.deepEqual(Array.from(rows[1]), ['x,y', 'z', 'q"q']);
+});
+
+test('主题导入/导出：序列化 + 校验（非法 ID/名称/颜色拒绝）', () => {
+  Renderer.THEMES['testtheme'] = { id: 'testtheme', name: '测试主题', bg: '#101820', dot: '#22303c', nodeFill: '#1a2733', nodeBorder: '#5b8ff7', nodeText: '#e4e9f2', subText: '#8b96ab', edge: '#3d4b66', edgeText: '#aab6cc', edgeTextBg: 'rgba(23,30,44,.95)', primary: '#5b8ff7', search: '#f59f24', dimNode: 0.16, dimEdge: 0.08, group: 'custom' };
+  const json = DataIO.serializeThemes(['testtheme']);
+  assert.ok(json.includes('rgxw-theme'), '输出带 app 标识');
+  const parsed = DataIO.parseThemeFile(json);
+  assert.equal(parsed.error, undefined);
+  assert.equal(parsed.ok.length, 1);
+  assert.equal(parsed.ok[0].name, '测试主题');
+  // 非法：非法 ID / 缺名称 / 非 #hex 颜色 / 空主题
+  for (const t of [
+    { id: 'bad!id', name: 'x', bg: '#101820', nodeFill: '#fff', nodeBorder: '#000', nodeText: '#000', subText: '#000', edge: '#000', edgeText: '#000', primary: '#000', search: '#000' },
+    { id: 'okid', name: '', bg: '#101820', nodeFill: '#fff', nodeBorder: '#000', nodeText: '#000', subText: '#000', edge: '#000', edgeText: '#000', primary: '#000', search: '#000' },
+    { id: 'okid2', name: 'x', bg: 'red', nodeFill: '#fff', nodeBorder: '#000', nodeText: '#000', subText: '#000', edge: '#000', edgeText: '#000', primary: '#000', search: '#000' },
+    null
+  ]) assert.ok(DataIO.validateTheme(t), '应拒绝非法主题');
+  delete Renderer.THEMES['testtheme'];
 });
 
 test('Markdown 模板：模板自身可被解析（人物/关系/事件齐全）', () => {

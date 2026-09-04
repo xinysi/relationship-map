@@ -25,6 +25,7 @@ const App = {
     I18n.applyDom(document);
 
     Renderer.init(document.getElementById('canvas'));
+    this.loadCustomThemes();
     Renderer.setThemeName(this.currentTheme);
     document.body.dataset.theme = this.currentTheme;
 
@@ -364,6 +365,65 @@ const App = {
       case 'guide': this.showGuide(); break;
       case 'about': this.openAboutModal(); break;
     }
+  },
+
+  /* ============================================================
+     自定义主题：加载 / 动态面板 CSS / 导入导出
+     ============================================================ */
+  loadCustomThemes() {
+    const s = ProjectStore.loadSettings();
+    this._customThemeIds = new Set();
+    const list = (Array.isArray(s.customThemes) ? s.customThemes : []).slice();
+    for (const t of list) {
+      if (DataIO.validateTheme(t)) continue;
+      Renderer.THEMES[t.id] = Object.assign({}, t, { group: t.group || 'custom' });
+      this._customThemeIds.add(t.id);
+    }
+    this.applyCustomThemeCss(list);
+  },
+
+  applyCustomThemeCss(list) {
+    let el = document.getElementById('customThemeCss');
+    if (!el) { el = document.createElement('style'); el.id = 'customThemeCss'; document.head.appendChild(el); }
+    el.textContent = (list || []).map(t => {
+      const bg = t.bg, panel = t.nodeFill || '#ffffff', text = t.nodeText, sub = t.subText,
+        border = t.edge, primary = t.primary, soft = t.edge || '#e2e8f0';
+      return `body[data-theme="${t.id}"]{--bg:${bg};--panel:${panel};--panel2:${t.dot || bg};--border:${border};--text:${text};--sub:${sub};--primary:${primary};--primary-h:${primary};--primary-soft:${soft};--shadow:0 6px 24px rgba(0,0,0,.35);}`;
+    }).join('\n');
+  },
+
+  exportThemes(ids) {
+    const json = DataIO.serializeThemes(ids);
+    Utils.download(`人物关系网主题-${GraphStore.projectName}.json`, json, 'application/json');
+    this.toast(ids && ids.length ? I18n.tr('主题文件已导出') : I18n.tr('全部主题已导出'), 'success');
+  },
+
+  importThemeFile() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = async () => {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      const text = await file.text();
+      const res = DataIO.parseThemeFile(text);
+      if (res.error) { this.toast(`导入主题失败：${res.error}`, 'error'); return; }
+      const s = ProjectStore.loadSettings();
+      const custom = (Array.isArray(s.customThemes) ? s.customThemes : []).slice();
+      const byId = new Map(custom.map(t => [t.id, t]));
+      for (const t of res.ok) {
+        const merged = Object.assign({}, byId.get(t.id), t, { group: t.group || 'custom' });
+        byId.set(t.id, merged);
+        Renderer.THEMES[t.id] = merged;
+      }
+      const merged = [...byId.values()];
+      ProjectStore.saveSettings({ customThemes: merged });
+      this._customThemeIds = new Set(merged.map(t => t.id));
+      this.applyCustomThemeCss(merged);
+      this.toast(`${I18n.tr('主题已导入')} ${res.ok.length}${res.bad.length ? `，${res.bad.length} ${I18n.tr('条无效')}（${res.bad.slice(0, 2).join('；')}）` : ''}`, res.bad.length ? 'warn' : 'success');
+      this.openThemesModal();
+    };
+    input.click();
   },
 
   /* ============================================================
@@ -1956,7 +2016,7 @@ const App = {
     const GROUP_ORDER = [['classic', '经典'], ['nature', '自然'], ['warm', '暖阳'], ['cool', '冷调'],
       ['pink', '粉紫'], ['redgold', '炽金'], ['retro', '复古'], ['trendy', '潮流'],
       ['chinese', '国风'], ['dessert', '甜品'], ['scifi', '科幻'], ['gothic', '暗黑'],
-      ['metal', '金属'], ['pastel', '暖纱'], ['weave', '织锦'], ['festival', '灯会']];
+      ['metal', '金属'], ['pastel', '暖纱'], ['weave', '织锦'], ['festival', '灯会'], ['custom', '自定义']];
     const entries = Object.entries(Renderer.THEMES);
     const cardHTML = (id, t) => `
         <div class="theme-card ${this.currentTheme === id ? 'active' : ''}" data-theme="${id}">
@@ -1974,7 +2034,14 @@ const App = {
         <div class="theme-grid wide">${items.map(([id, t]) => cardHTML(id, t)).join('')}</div></div>`;
     }).join('');
     const names = Object.fromEntries(entries);
-    const m = this.openModal({ title: '主题切换', width: 860, bodyHTML });
+    const m = this.openModal({
+      title: '主题切换', width: 860, bodyHTML,
+      footerHTML: `<button class="btn" data-act="exportOne">${I18n.tr('导出当前主题')}</button><button class="btn" data-act="exportAll">${I18n.tr('导出全部主题')}</button><button class="btn" data-act="import">${I18n.tr('导入主题')}</button><button class="btn" data-act="cancel">${I18n.tr('关闭')}</button>`
+    });
+    m.body.parentElement.querySelector('[data-act=cancel]').onclick = m.close;
+    m.body.parentElement.querySelector('[data-act=exportOne]').onclick = () => this.exportThemes([this.currentTheme]);
+    m.body.parentElement.querySelector('[data-act=exportAll]').onclick = () => this.exportThemes();
+    m.body.parentElement.querySelector('[data-act=import]').onclick = () => this.importThemeFile();
     m.body.querySelectorAll('.theme-card').forEach(card => {
       card.onclick = () => {
         this.currentTheme = card.dataset.theme;

@@ -60,6 +60,16 @@ const App = {
     const root = document.getElementById('toastRoot');
     const el = document.createElement('div');
     el.className = 'toast ' + (type || 'info');
+    // 配色实时读取当前主题变量并内联，防止第三方样式（浏览器脚本）覆盖导致与主题脱色；
+    // 读取失败时回退 var() 由 CSS 主题变量接管
+    const cs = getComputedStyle(document.body);
+    const v = (name) => (cs.getPropertyValue(name).trim() || '');
+    if (v('--panel')) {
+      el.style.setProperty('background', v('--panel'), 'important');
+      el.style.setProperty('color', v('--text'), 'important');
+      el.style.setProperty('box-shadow', v('--shadow'), 'important');
+      el.style.setProperty('border-left-color', type === 'error' ? v('--err') : type === 'warn' ? v('--warn') : type === 'success' ? v('--ok') : v('--primary'), 'important');
+    }
     el.innerHTML = `<span>${Utils.escapeHtml(text)}</span><span class="t-close">✕</span>`;
     el.querySelector('.t-close').onclick = () => el.remove();
     root.appendChild(el);

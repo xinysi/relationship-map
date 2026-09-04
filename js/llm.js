@@ -6,6 +6,17 @@
 ------------------------------------------------ */
 const LlmExtract = {
 
+  /* 常用服务预设：选择后自动填入服务地址与模型名（可再修改） */
+  PRESETS: [
+    { id: 'deepseek', name: 'DeepSeek（深寻）', base: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
+    { id: 'openai', name: 'OpenAI', base: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
+    { id: 'zhipu', name: '智谱 GLM（大模型开放平台）', base: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4-flash' },
+    { id: 'qwen', name: '通义千问（阿里云百炼）', base: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus' },
+    { id: 'kimi', name: 'Kimi（月之暗面）', base: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k' }
+  ],
+  presetById(id) {
+    return this.PRESETS.find(p => p.id === id) || null;
+  },
   DEFAULT: {
     llmBase: 'https://api.deepseek.com/v1',
     llmModel: 'deepseek-chat',

@@ -1451,7 +1451,8 @@ const App = {
           <a href="javascript:void(0)" id="llmToggleCfg" style="color:var(--primary)">⚙ 配置 AI 服务（当前：${Utils.escapeHtml(cfg.llmModel || '未设置')}）</a>
         </div>
         <div id="llmCfgPanel" class="hidden" style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:12px;background:var(--panel2)">
-          <div class="form-item"><label>服务地址（OpenAI 兼容，DeepSeek 示例：https://api.deepseek.com/v1）</label>
+          <div class="form-item"><label>服务预设</label><select id="llmPreset"><option value="">— 选择服务预设（可再修改） —</option><option value="deepseek">DeepSeek（deepseek-chat）</option><option value="openai">OpenAI（gpt-4o-mini）</option><option value="zhipu">智谱 GLM（glm-4-flash）</option><option value="qwen">通义千问（qwen-plus）</option><option value="kimi">Kimi（moonshot-v1-8k）</option></select></div>
+          <div class="form-item"><label>服务地址（OpenAI 兼容，可手填）</label>
             <input type="text" id="llmBase" value="${Utils.escapeHtml(cfg.llmBase || '')}" placeholder="https://api.deepseek.com/v1"></div>
           <div class="form-item"><label>模型名</label>
             <input type="text" id="llmModel" value="${Utils.escapeHtml(cfg.llmModel || '')}" placeholder="deepseek-chat"></div>
@@ -1475,6 +1476,13 @@ const App = {
     toggleCfg.onclick = () => {
       const hidden = cfgPanel.classList.toggle('hidden');
       toggleCfg.textContent = (hidden ? '⚙ 配置 AI 服务' : '▾ 收起配置') + `（当前：${ProjectStore.loadSettings().llmModel || '未设置'}）`;
+    };
+    m.body.querySelector('#llmPreset').onchange = (e) => {
+      const p = LlmExtract.presetById(e.target.value);
+      if (p) {
+        m.body.querySelector('#llmBase').value = p.base;
+        m.body.querySelector('#llmModel').value = p.model;
+      }
     };
     m.body.querySelector('#llmSaveCfg').onclick = () => {
       const base = m.body.querySelector('#llmBase').value.trim().replace(/\/+$/, '');
@@ -1510,19 +1518,42 @@ const App = {
             <div class="rs-card ok"><div class="num">${res.events.length}</div><div class="lbl">事件</div></div>
             <div class="rs-card ${orphan ? 'bad' : 'ok'}"><div class="num">${orphan}</div><div class="lbl">无效关系引用</div></div>
           </div>
+          <div class="ai-confirm" style="margin-top:12px">
+            <div class="ai-g"><label><input type="checkbox" class="ai-all" data-target=".ai-p" checked> 全选人物</label>
+              <div class="ai-list">${res.persons.map(p => '<label class="ai-item"><input type="checkbox" class="ai-p" data-v="' + Utils.escapeHtml(p.id) + '" checked> ' + Utils.escapeHtml(p.name || p.id) + '</label>').join('')}</div></div>
+            <div class="ai-g"><label><input type="checkbox" class="ai-all" data-target=".ai-r" checked> 全选关系</label>
+              <div class="ai-list">${res.relations.map(r => '<label class="ai-item"><input type="checkbox" class="ai-r" data-v="' + Utils.escapeHtml(r.id || '') + '" checked> ' + Utils.escapeHtml(r.relationType || '关系') + '</label>').join('')}</div></div>
+            <div class="ai-g"><label><input type="checkbox" class="ai-all" data-target=".ai-e" checked> 全选事件</label>
+              <div class="ai-list">${res.events.map(e => '<label class="ai-item"><input type="checkbox" class="ai-e" data-v="' + Utils.escapeHtml(e.title || '') + '" checked> ' + Utils.escapeHtml(e.title || '事件') + '</label>').join('')}</div></div>
+          </div>
           <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
             <select id="llmMode" style="flex:none">
               <option value="replace">替换当前画布</option>
               <option value="append">追加到当前画布</option>
             </select>
-            <button class="btn primary" data-act="apply">应用提取结果</button>
+            <button class="btn primary" data-act="apply">应用选中项</button>
           </div>`;
+        result.querySelectorAll('.ai-all').forEach(all => {
+          all.onchange = () => result.querySelectorAll(all.dataset.target).forEach(c => { c.checked = all.checked; });
+        });
         result.querySelector('[data-act=apply]').onclick = async () => {
           const mode = result.querySelector('#llmMode').value;
+          // 勾选子集：关系端点人物自动纳入，避免孤儿引用
+          const picked = (cls) => new Set([...result.querySelectorAll(cls + ':checked')].map(c => c.dataset.v));
+          const pPick = picked('.ai-p'), rPick = picked('.ai-r'), ePick = picked('.ai-e');
+          if (!pPick.size && !rPick.size && !ePick.size) { this.toast('请至少勾选一项', 'warn'); return; }
+          const relSub = res.relations.filter(r => rPick.has(r.id));
+          relSub.forEach(r => { pPick.add(r.sourceId); pPick.add(r.targetId); });
+          const evSub = res.events.filter(e => ePick.has(e.title));
+          const sub = {
+            persons: res.persons.filter(p => pPick.has(p.id)),
+            relations: relSub,
+            events: evSub
+          };
           // 构造内存 JSON 文件复用 DataIO.parseFiles 的追加管线：
           // 追加模式下自动完成「ID 去重 + 按姓名/别名合并 + 关系端点重映射」，
           // 与导入 MD/CSV 追加行为一致，避免重复 ID 导致人物丢失/覆盖
-          const file = new File([JSON.stringify({ persons: res.persons, relations: res.relations, events: res.events })], 'ai-extract.json', { type: 'application/json' });
+          const file = new File([JSON.stringify(sub)], 'ai-extract.json', { type: 'application/json' });
           let parsed;
           try {
             parsed = await DataIO.parseFiles([file], { mode }, () => {});
@@ -2139,6 +2170,7 @@ const App = {
         </div>
         <div class="dt-section-title">AI 服务（智能提取功能，可选配置）</div>
         <div class="form-hint" style="margin-bottom:8px">OpenAI 兼容接口；密钥仅保存在本机浏览器。⚠ 使用智能提取会把文本发送至该服务。</div>
+        <div class="form-item" style="max-width:280px"><label>服务预设</label><select id="set-llmPreset"><option value="">— 选择服务预设（可再修改） —</option><option value="deepseek">DeepSeek（deepseek-chat）</option><option value="openai">OpenAI（gpt-4o-mini）</option><option value="zhipu">智谱 GLM（glm-4-flash）</option><option value="qwen">通义千问（qwen-plus）</option><option value="kimi">Kimi（moonshot-v1-8k）</option></select></div>
         <div class="form-row">
           <div class="form-item" style="flex:2"><label>服务地址 Base URL</label>
             <input type="text" id="set-llmBase" value="${Utils.escapeHtml(s.llmBase || '')}" placeholder="https://api.deepseek.com/v1"></div>
@@ -2157,6 +2189,13 @@ const App = {
     m.body.querySelector('#set-interval').addEventListener('input', (e) => {
       m.body.querySelector('#set-intervalV').textContent = e.target.value + 's';
     });
+    m.body.querySelector('#set-llmPreset').onchange = (e) => {
+      const p = LlmExtract.presetById(e.target.value);
+      if (p) {
+        m.body.querySelector('#set-llmBase').value = p.base;
+        m.body.querySelector('#set-llmModel').value = p.model;
+      }
+    };
     m.body.querySelector('#btnTestLlm').onclick = async () => {
       const base = m.body.querySelector('#set-llmBase').value.trim().replace(/\/+$/, '');
       const model = m.body.querySelector('#set-llmModel').value.trim();

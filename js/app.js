@@ -964,18 +964,18 @@ const App = {
       if (p) { box.innerHTML = I18n.trHtml(this.personDetailHTML(p)); this.bindDetailEvents(box); return; }
     }
     if (GraphStore.selection.size > 1) {
-      box.innerHTML = `
+      box.innerHTML = I18n.trHtml(`
         <div class="dt-name">已选中 ${GraphStore.selection.size} 个人物</div>
         <div class="empty-tip" style="padding:10px">可统一修改分组、标签、样式，或批量删除</div>
         <div class="dt-btns">
           <button class="btn primary" data-act="batch">批量编辑</button>
           <button class="btn danger-ghost" data-act="batchDel">批量删除</button>
-        </div>`;
+        </div>`);
       box.querySelector('[data-act=batch]').onclick = () => this.openBatchEditModal();
       box.querySelector('[data-act=batchDel]').onclick = () => this.deleteSelection([...GraphStore.selection]);
       return;
     }
-    box.innerHTML = '<div class="empty-tip">单击节点或关系线<br>查看 / 编辑详细信息</div>';
+    box.innerHTML = I18n.trHtml('<div class="empty-tip">单击节点或关系线<br>查看 / 编辑详细信息</div>');
   },
 
   personDetailHTML(p) {
@@ -2284,7 +2284,7 @@ const App = {
     const vp = GraphStore.visiblePersons().length;
     const vr = GraphStore.visibleRelations().length;
     const evCount = (GraphStore.events || []).length;
-    const N = I18n.tr, en = I18n.lang === 'en';
+    const N = (t) => I18n.tr(t), en = I18n.lang === 'en';
     document.getElementById('sbStats').textContent =
       `${en ? 'Nodes' : '节点'} ${GraphStore.persons.length}${vp !== GraphStore.persons.length ? `（${en ? 'showing' : '显示'} ${vp}）` : ''} · ${en ? 'Relations' : '关系'} ${GraphStore.relations.length}${vr !== GraphStore.relations.length ? `（${en ? 'showing' : '显示'} ${vr}）` : ''}${evCount ? ` · ${en ? 'Events' : '事件'} ${evCount}` : ''}`;
     document.getElementById('sbSelection').textContent =

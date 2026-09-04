@@ -82,35 +82,24 @@ const Renderer = {
     winter:   { name: '冬雪', group: 'cool', bg: '#f2f7fb', dot: '#dde9f5', nodeFill: '#ffffff', nodeBorder: '#a6c8e0', nodeText: '#33414f', subText: '#7d93a8', edge: '#d3e2ef', edgeText: '#5b7a95', edgeTextBg: 'rgba(255,255,255,.95)', primary: '#6b9cc4', search: '#e8890c', dimNode: 0.16, dimEdge: 0.07 }
   },
 
-  /* ---------- 主题排版预设（字体 / 圆角 / 字距 / 节点描边），按主题风格指派 ---------- */
-  UI_PRESETS: {
-    clean:    { font: '"Microsoft YaHei","PingFang SC","Segoe UI",sans-serif', radius: 8,  radiusSm: 6,  letter: 0,   stroke: 1.5 },
-    rounded:  { font: '"幼圆","YouYuan","Varela Round","Microsoft YaHei",sans-serif', radius: 16, radiusSm: 10, letter: .4, stroke: 1.5 },
-    cute:     { font: '"幼圆","YouYuan","Varela Round","Microsoft YaHei",sans-serif', radius: 20, radiusSm: 12, letter: 1,   stroke: 1.8 },
-    serif:    { font: '"宋体","SimSun","Songti SC",serif', radius: 4,  radiusSm: 2,  letter: .6, stroke: 1.8 },
-    tech:     { font: '"Microsoft YaHei","PingFang SC","Segoe UI",sans-serif', radius: 5,  radiusSm: 3,  letter: -.3, stroke: 2.2 },
-    bold:     { font: '"Microsoft YaHei","PingFang SC","Segoe UI",sans-serif', radius: 2,  radiusSm: 1,  letter: -.2, stroke: 2.6 },
-    elegant:  { font: '"Microsoft YaHei","PingFang SC","Segoe UI",sans-serif', radius: 8,  radiusSm: 5,  letter: .3,  stroke: 1.8 },
-    minimal:  { font: '"Microsoft YaHei","PingFang SC","Segoe UI",sans-serif', radius: 0,  radiusSm: 0,  letter: 0,   stroke: 1.2 }
+  /* ---------- 画布版式（按主题分类组指派：节点形状 / 连线线型 / 背景 / 光效） ---------- */
+  LAYOUTS: {
+    classic: { shape: 'circle', edge: 'curve',    bg: 'dots',     fx: 'none' },
+    nature:  { shape: 'circle', edge: 'curve',    bg: 'dots',     fx: 'soft' },
+    warm:    { shape: 'circle', edge: 'curve',    bg: 'dots',     fx: 'none' },
+    cool:    { shape: 'circle', edge: 'straight', bg: 'gradient', fx: 'none' },
+    pink:    { shape: 'circle', edge: 'curve',    bg: 'dots',     fx: 'soft' },
+    redgold: { shape: 'circle', edge: 'curve',    bg: 'gradient', fx: 'double' },
+    retro:   { shape: 'circle', edge: 'straight', bg: 'plain',    fx: 'double' },
+    trendy:  { shape: 'rect',   edge: 'straight', bg: 'dots',     fx: 'none' },
+    chinese: { shape: 'circle', edge: 'curve',    bg: 'plain',    fx: 'none' },
+    dessert: { shape: 'circle', edge: 'curve',    bg: 'dots',     fx: 'soft' },
+    scifi:   { shape: 'hex',    edge: 'straight', bg: 'grid',     fx: 'glow' },
+    gothic:  { shape: 'diamond', edge: 'straight', bg: 'gradient', fx: 'none' }
   },
-  _uiMap: {
-    light: 'clean', dark: 'clean', simple: 'minimal', business: 'elegant',
-    forest: 'rounded', mint: 'rounded', sage: 'rounded', lime: 'cute',
-    pine: 'tech', emerald: 'rounded', lagoon: 'tech', velvet: 'rounded',
-    sunset: 'clean', sun: 'cute', coffee: 'elegant', fire: 'bold', coral: 'cute',
-    terracotta: 'clean', amber: 'elegant', champagne: 'elegant',
-    ocean: 'clean', sky: 'clean', navy: 'bold', cobalt: 'tech', indigo: 'clean',
-    graphite: 'tech', ink: 'tech', obsidian: 'tech',
-    sakura: 'rounded', violet: 'rounded', lavender: 'rounded', night: 'tech', rose: 'rounded',
-    plum: 'rounded', wine: 'elegant', fuchsia: 'cute', royal: 'tech',
-    flame: 'elegant', ember: 'bold', gold: 'elegant',
-    retro: 'rounded', vintage: 'serif', pixel: 'bold',
-    sweetcool: 'cute', y2k: 'tech', pop: 'bold', graffiti: 'bold',
-    chinese: 'serif', inkwash: 'serif',
-    macaron: 'cute', candy: 'cute', lemonade: 'cute',
-    cyber: 'tech', crt: 'tech', firefly: 'rounded',
-    gothic: 'bold',
-    matcha: 'rounded', beach: 'clean', autumn: 'elegant', winter: 'minimal'
+  layoutOf(id) {
+    const g = (this.THEMES[id] || {}).group || 'classic';
+    return this.LAYOUTS[g] || this.LAYOUTS.classic;
   },
 
   init(canvas) {
@@ -121,9 +110,6 @@ const Renderer = {
     this.resize();
     Utils.emitter.on('graph:change', () => { this._parallelDirty = true; this._pruneAvatarCache(); this.requestDraw(); });
   },
-
-  uiPresetKey(id) { return this._uiMap[id] || 'clean'; },
-  uiPreset(id) { return this.UI_PRESETS[this.uiPresetKey(id)]; },
 
   /* 人物删除后清理头像缓存，避免缓存无限增长 */
   _pruneAvatarCache() {
@@ -304,24 +290,46 @@ const Renderer = {
   drawScene(ctx, view, w, h, opts) {
     opts = opts || {};
     const th = this.theme;
-    const ui = this.uiPreset(this._themeId);
+    const layout = this.layoutOf(this._themeId);
     const scale = view.scale;
     // 导出时文字/线宽随倍率同步放大，避免导出图放大查看时文字发糊（屏幕渲染保持固定字号）
     const fs = opts.forExport ? scale : 1;
 
-    // 背景
+    // 背景（主题版式：点阵 / 网格 / 径向渐变 / 纯色）
     if (!opts.transparent) {
       ctx.fillStyle = th.bg;
       ctx.fillRect(0, 0, w, h);
-      // 点阵网格
       if (!opts.forExport && scale >= 0.4) {
-        const step = 42 * scale;
-        if (w / step < 160 && h / step < 160) {
-          ctx.fillStyle = th.dot;
-          const ox = ((view.x % step) + step) % step, oy = ((view.y % step) + step) % step;
-          for (let x = ox; x < w; x += step) {
-            for (let y = oy; y < h; y += step) ctx.fillRect(x - 0.5, y - 0.5, 1.5, 1.5);
+        if (layout.bg === 'dots') {
+          const step = 42 * scale;
+          if (w / step < 160 && h / step < 160) {
+            ctx.fillStyle = th.dot;
+            const ox = ((view.x % step) + step) % step, oy = ((view.y % step) + step) % step;
+            for (let x = ox; x < w; x += step) {
+              for (let y = oy; y < h; y += step) ctx.fillRect(x - 0.5, y - 0.5, 1.5, 1.5);
+            }
           }
+        } else if (layout.bg === 'grid') {
+          const step = 48 * scale;
+          if (w / step < 160 && h / step < 160) {
+            ctx.strokeStyle = th.edge;
+            ctx.globalAlpha = 0.55;
+            ctx.lineWidth = 1;
+            const ox = ((view.x % step) + step) % step, oy = ((view.y % step) + step) % step;
+            for (let x = ox; x < w; x += step) {
+              ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+            }
+            for (let y = oy; y < h; y += step) {
+              ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+            }
+            ctx.globalAlpha = 1;
+          }
+        } else if (layout.bg === 'gradient') {
+          const rg = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.72);
+          rg.addColorStop(0, th.bg);
+          rg.addColorStop(1, th.dot);
+          ctx.fillStyle = rg;
+          ctx.fillRect(0, 0, w, h);
         }
       }
     }
@@ -385,11 +393,13 @@ const Renderer = {
         ctx.stroke();
         ctx.setLineDash([]);
       } else {
-        // 平滑曲线（平行边相互错开）
+        // 平滑曲线（平行边相互错开）；straight 版式直线连接
         let x1 = s.x, y1 = s.y, x2 = t.x, y2 = t.y;
         const dx = x2 - x1, dy = y2 - y1;
         const d = Math.sqrt(dx * dx + dy * dy) || 1;
-        const off = (meta.count === 1) ? this.options.curvature : ((meta.index - (meta.count - 1) / 2) * 0.34);
+        const off = (meta.count === 1)
+          ? (layout.edge === 'straight' ? 0 : this.options.curvature)
+          : ((meta.index - (meta.count - 1) / 2) * 0.34);
         const mx = (x1 + x2) / 2 - dy / d * off * d;
         const my = (y1 + y2) / 2 + dx / d * off * d;
         const X1 = x1 * scale + view.x, Y1 = y1 * scale + view.y;
@@ -451,7 +461,7 @@ const Renderer = {
     }
     ctx.setLineDash([]);
     ctx.globalAlpha = 1;
-    ctx.font = (11 * fs) + 'px ' + ui.font;
+    ctx.font = (11 * fs) + 'px "Microsoft YaHei", sans-serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     for (const lb of edgeLabelList) {
       const tw = ctx.measureText(lb.text).width;
@@ -466,7 +476,7 @@ const Renderer = {
     }
 
     /* ----- 人物节点 ----- */
-    const fontLabel = `${this.options.labelSize * fs}px ${ui.font}`;
+    const fontLabel = `${this.options.labelSize * fs}px "Microsoft YaHei", sans-serif`;
     // 大规模数据 + 低缩放时隐藏姓名标签，保证交互流畅（悬浮/选中仍显示）
     const hideLabels = !opts.forExport && scale < 0.6 && GraphStore.persons.length > 500;
     for (const p of GraphStore.persons) {
@@ -514,29 +524,53 @@ const Renderer = {
         ctx.setLineDash([]);
       }
 
-      // 节点主体
+      // 节点主体（形状：主题版式缺省，节点自定义 style.shape 优先）
+      const shape = st.shape || layout.shape;
       ctx.beginPath();
-      if (st.shape === 'rect') {
+      if (shape === 'rect') {
         const rw = r * 1.7, rh = r * 1.3;
         if (ctx.roundRect) ctx.roundRect(X - rw / 2, Y - rh / 2, rw, rh, Math.min(10, r * 0.4));
         else ctx.rect(X - rw / 2, Y - rh / 2, rw, rh);
+      } else if (shape === 'hex') {
+        const k = r * 1.15;
+        for (let i = 0; i < 6; i++) {
+          const a = Math.PI / 3 * i + Math.PI / 6;
+          const px = X + Math.cos(a) * k, py = Y + Math.sin(a) * k;
+          if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py);
+        }
+        ctx.closePath();
+      } else if (shape === 'diamond') {
+        const k = r * 1.3;
+        ctx.moveTo(X, Y - k); ctx.lineTo(X + k, Y); ctx.lineTo(X, Y + k); ctx.lineTo(X - k, Y);
+        ctx.closePath();
       } else {
         ctx.arc(X, Y, r, 0, Math.PI * 2);
       }
       ctx.fillStyle = fill;
+      // 主题光效：soft 柔影 / glow 霓虹发光（深色主题）/ double 复古双线
       if (isHover || isSelected) { ctx.shadowColor = 'rgba(63,126,247,.45)'; ctx.shadowBlur = 12 * fs; }
+      else if (layout.fx === 'soft') { ctx.shadowColor = 'rgba(0,0,0,.22)'; ctx.shadowBlur = 9 * fs; }
+      else if (layout.fx === 'glow') { ctx.shadowColor = th.primary; ctx.shadowBlur = 16 * fs; }
       ctx.fill();
       ctx.shadowBlur = 0;
       ctx.strokeStyle = borderColor;
-      ctx.lineWidth = Math.max(1.5, rWorld * 0.09) * (isHover ? 1.4 : 1) * fs * (ui.stroke / 1.5);
+      ctx.lineWidth = Math.max(1.5, rWorld * 0.09) * (isHover ? 1.4 : 1) * fs;
       ctx.stroke();
+      if (layout.fx === 'double') {
+        ctx.beginPath();
+        ctx.strokeStyle = th.bg;
+        ctx.lineWidth = 1.3 * fs;
+        ctx.arc(X, Y, Math.max(2, r * 0.74), 0, Math.PI * 2);
+        ctx.stroke();
+      }
 
-      // 头像或首字
+      // 头像或首字（裁剪圆随形状收紧，避免超出轮廓）
       const av = opts.noAvatar ? null : this.ensureAvatar(p);
+      const clipR = shape === 'rect' ? r * 0.6 : shape === 'diamond' ? r * 0.85 : shape === 'hex' ? r * 0.95 : r - 1.5;
       if (av && av.ok && av.img) {
         ctx.save();
         ctx.beginPath();
-        ctx.arc(X, Y, r - 1.5, 0, Math.PI * 2);
+        ctx.arc(X, Y, clipR, 0, Math.PI * 2);
         ctx.clip();
         const iw = av.img.naturalWidth || av.img.width, ih = av.img.naturalHeight || av.img.height;
         if (iw && ih) {
@@ -547,7 +581,7 @@ const Renderer = {
       } else {
         ctx.fillStyle = borderColor;
         ctx.globalAlpha = alpha * 0.75;
-        ctx.font = `600 ${Math.max(11, r * 0.75)}px ${ui.font}`;
+        ctx.font = `600 ${Math.max(11, r * 0.75)}px "Microsoft YaHei", sans-serif`;
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText((p.name || '?').charAt(0), X, Y + 1);
         ctx.globalAlpha = alpha;

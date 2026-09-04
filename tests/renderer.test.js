@@ -30,23 +30,24 @@ test('60 套主题且名称/分组完整', () => {
   assert.equal(Renderer.THEMES.macaron.group, 'dessert');
 });
 
-test('主题排版预设：8 套且每主题有指派', () => {
-  const PRESET_KEYS = ['clean', 'rounded', 'cute', 'serif', 'tech', 'bold', 'elegant', 'minimal'];
-  assert.equal(Object.keys(Renderer.UI_PRESETS).length, PRESET_KEYS.length);
-  for (const k of PRESET_KEYS) {
-    const p = Renderer.UI_PRESETS[k];
-    assert.ok(p.font && typeof p.radius === 'number' && typeof p.letter === 'number' && typeof p.stroke === 'number', `预设 ${k} 字段完整`);
+test('画布版式：12 组均有 layout 且每主题可解析', () => {
+  const groups = new Set(Object.values(Renderer.THEMES).map(t => t.group));
+  assert.equal(Object.keys(Renderer.LAYOUTS).length, groups.size);
+  const shapes = ['circle', 'rect', 'hex', 'diamond'];
+  const bgs = ['dots', 'grid', 'gradient', 'plain'];
+  const fxs = ['none', 'soft', 'glow', 'double'];
+  for (const [g, l] of Object.entries(Renderer.LAYOUTS)) {
+    assert.ok(shapes.includes(l.shape), `组 ${g} shape 有效`);
+    assert.ok(l.edge === 'curve' || l.edge === 'straight', `组 ${g} edge 有效`);
+    assert.ok(bgs.includes(l.bg), `组 ${g} bg 有效`);
+    assert.ok(fxs.includes(l.fx), `组 ${g} fx 有效`);
   }
-  for (const id of Object.keys(Renderer.THEMES)) {
-    const key = Renderer.uiPresetKey(id);
-    assert.ok(Renderer.UI_PRESETS[key], `主题 ${id} 排版预设有效`);
-    assert.ok(Renderer.uiPreset(id), `主题 ${id} 可解析预设`);
-  }
-  assert.equal(Renderer.uiPresetKey('cyber'), 'tech');
-  assert.equal(Renderer.uiPresetKey('chinese'), 'serif');
-  assert.equal(Renderer.uiPresetKey('macaron'), 'cute');
-  assert.equal(Renderer.uiPresetKey('simple'), 'minimal');
-  assert.equal(Renderer.uiPresetKey('unknown'), 'clean');
+  for (const id of Object.keys(Renderer.THEMES)) assert.ok(Renderer.layoutOf(id), `主题 ${id} 有版式`);
+  assert.equal(Renderer.layoutOf('cyber').shape, 'hex');
+  assert.equal(Renderer.layoutOf('chinese').edge, 'curve');
+  assert.equal(Renderer.layoutOf('retro').edge, 'straight');
+  assert.equal(Renderer.layoutOf('simple').shape, 'circle');
+  assert.equal(Renderer.layoutOf('unknown').shape, 'circle');
 });
 
 test('_highlightCtx：pinned 优先于 hover', () => {

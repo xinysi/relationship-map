@@ -11,8 +11,6 @@
   --ok: #22a06b; --warn: #f59f24; --err: #e5484d;
   --shadow: 0 6px 24px rgba(30,40,60,.12);
   --radius: 8px; --radius-sm: 6px;
-  --ui-font: "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
-  --ui-letter: 0px;
 }
 body[data-theme="dark"] {
   --bg: #10141c; --panel: #1a212e; --panel2: #151b26;
@@ -369,37 +367,11 @@ body[data-theme="winter"] {
   --shadow: 0 6px 24px rgba(70,100,140,.13);
 }
 
-/* ---------- 主题排版预设（随 data-ui 切换，app.js 与画布 theme.ui 同步） ---------- */
-body[data-ui="rounded"] {
-  --ui-font: "幼圆", "YouYuan", "Varela Round", "Microsoft YaHei", sans-serif;
-  --ui-letter: .4px; --radius: 16px; --radius-sm: 10px;
-}
-body[data-ui="cute"] {
-  --ui-font: "幼圆", "YouYuan", "Varela Round", "Microsoft YaHei", sans-serif;
-  --ui-letter: 1px; --radius: 20px; --radius-sm: 12px;
-}
-body[data-ui="serif"] {
-  --ui-font: "宋体", "SimSun", "Songti SC", serif;
-  --ui-letter: .6px; --radius: 4px; --radius-sm: 2px;
-}
-body[data-ui="tech"] {
-  --ui-letter: -.3px; --radius: 5px; --radius-sm: 3px;
-}
-body[data-ui="bold"] {
-  --ui-letter: -.2px; --radius: 2px; --radius-sm: 1px;
-}
-body[data-ui="elegant"] {
-  --ui-letter: .3px; --radius: 8px; --radius-sm: 5px;
-}
-body[data-ui="minimal"] {
-  --ui-letter: 0px; --radius: 0px; --radius-sm: 0px;
-}
 
 * { margin:0; padding:0; box-sizing:border-box; }
 html, body { height:100%; overflow:hidden; }
 body {
-  font-family: var(--ui-font);
-  letter-spacing: var(--ui-letter);
+  font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
   font-size: 13px; color: var(--text); background: var(--bg);
   -webkit-font-smoothing: antialiased;
 }

@@ -1532,8 +1532,7 @@ const DataIO = {
     const w = bbox.w + pad * 2, h = bbox.h + pad * 2;
     const th = Renderer.theme;
     const esc = Utils.escapeHtml;
-    const uiFont = esc(Renderer.uiPreset(Renderer._themeId || 'light').font);
-    const uiStrokeK = Renderer.uiPreset(Renderer._themeId || 'light').stroke / 1.5;
+    const layout = Renderer.layoutOf(Renderer._themeId || 'light');
     const f = (v) => (+v).toFixed(2);
     const parts = [];
 
@@ -1611,7 +1610,9 @@ const DataIO = {
       } else {
         const dx = ct.x - cs.x, dy = ct.y - cs.y;
         const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        const off = (meta.count === 1) ? Renderer.options.curvature : ((meta.index - (meta.count - 1) / 2) * 0.34);
+        const off = (meta.count === 1)
+          ? (layout.edge === 'straight' ? 0 : Renderer.options.curvature)
+          : ((meta.index - (meta.count - 1) / 2) * 0.34);
         const mx = (cs.x + ct.x) / 2 - dy / dist * off * dist;
         const my = (cs.y + ct.y) / 2 + dx / dist * off * dist;
         d = `M ${f(cs.x)} ${f(cs.y)} Q ${f(mx)} ${f(my)} ${f(ct.x)} ${f(ct.y)}`;
@@ -1626,7 +1627,9 @@ const DataIO = {
         } else {
           const dx = ct.x - cs.x, dy = ct.y - cs.y;
           const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-          const off = (meta.count === 1) ? Renderer.options.curvature : ((meta.index - (meta.count - 1) / 2) * 0.34);
+          const off = (meta.count === 1)
+            ? (layout.edge === 'straight' ? 0 : Renderer.options.curvature)
+            : ((meta.index - (meta.count - 1) / 2) * 0.34);
           const mx = (cs.x + ct.x) / 2 - dy / dist * off * dist;
           const my = (cs.y + ct.y) / 2 + dx / dist * off * dist;
           ang = Math.atan2(ct.y - my, ct.x - mx);
@@ -1673,18 +1676,29 @@ const DataIO = {
       const r = Renderer.nodeRadius(p);
       const border = st.border || (Renderer.options.colorByGroup && p.group ? Utils.colorForGroup(p.group) : th.nodeBorder);
       const fill = st.fill || th.nodeFill;
-      if (st.shape === 'rect') {
+      const shape = st.shape || layout.shape;
+      if (shape === 'rect') {
         const rw = r * 1.7, rh = r * 1.3;
-        parts.push(`<rect x="${f(c.x - rw / 2)}" y="${f(c.y - rh / 2)}" width="${f(rw)}" height="${f(rh)}" rx="${f(Math.min(10, r * 0.4))}" fill="${esc(fill)}" stroke="${esc(border)}" stroke-width="${f(Math.max(1.5, r * 0.09) * uiStrokeK)}"/>`);
+        parts.push(`<rect x="${f(c.x - rw / 2)}" y="${f(c.y - rh / 2)}" width="${f(rw)}" height="${f(rh)}" rx="${f(Math.min(10, r * 0.4))}" fill="${esc(fill)}" stroke="${esc(border)}" stroke-width="${f(Math.max(1.5, r * 0.09))}"/>`);
+      } else if (shape === 'hex') {
+        const k = r * 1.15;
+        const pts = Array.from({ length: 6 }, (_, i) => {
+          const a = Math.PI / 3 * i + Math.PI / 6;
+          return `${f(c.x + Math.cos(a) * k)},${f(c.y + Math.sin(a) * k)}`;
+        }).join(' ');
+        parts.push(`<polygon points="${pts}" fill="${esc(fill)}" stroke="${esc(border)}" stroke-width="${f(Math.max(1.5, r * 0.09))}" stroke-linejoin="round"/>`);
+      } else if (shape === 'diamond') {
+        const k = r * 1.3;
+        parts.push(`<polygon points="${f(c.x)},${f(c.y - k)} ${f(c.x + k)},${f(c.y)} ${f(c.x)},${f(c.y + k)} ${f(c.x - k)},${f(c.y)}" fill="${esc(fill)}" stroke="${esc(border)}" stroke-width="${f(Math.max(1.5, r * 0.09))}" stroke-linejoin="round"/>`);
       } else {
-        parts.push(`<circle cx="${f(c.x)}" cy="${f(c.y)}" r="${f(r)}" fill="${esc(fill)}" stroke="${esc(border)}" stroke-width="${f(Math.max(1.5, r * 0.09) * uiStrokeK)}"/>`);
+        parts.push(`<circle cx="${f(c.x)}" cy="${f(c.y)}" r="${f(r)}" fill="${esc(fill)}" stroke="${esc(border)}" stroke-width="${f(Math.max(1.5, r * 0.09))}"/>`);
       }
       const name = p.name || '未命名';
       // 圆内首字（与画布一致：无头像节点在中心绘制名字首字）
       const charFs = Math.max(11, r * 0.75);
-      parts.push(`<text x="${f(c.x)}" y="${f(c.y + charFs * 0.35)}" font-size="${f(charFs)}" font-weight="600" fill="${esc(border)}" opacity="0.75" text-anchor="middle" font-family="${uiFont}">${esc(name.charAt(0))}</text>`);
+      parts.push(`<text x="${f(c.x)}" y="${f(c.y + charFs * 0.35)}" font-size="${f(charFs)}" font-weight="600" fill="${esc(border)}" opacity="0.75" text-anchor="middle" font-family="Microsoft YaHei, PingFang SC, sans-serif">${esc(name.charAt(0))}</text>`);
       const tx = c.x, ty = c.y + r + 3;
-      parts.push(`<text x="${f(tx)}" y="${f(ty + fs * 0.9)}" font-size="${f(fs)}" fill="${esc(st.textColor || th.nodeText)}" text-anchor="middle" font-family="${uiFont}">${esc(name)}</text>`);
+      parts.push(`<text x="${f(tx)}" y="${f(ty + fs * 0.9)}" font-size="${f(fs)}" fill="${esc(st.textColor || th.nodeText)}" text-anchor="middle" font-family="Microsoft YaHei, PingFang SC, sans-serif">${esc(name)}</text>`);
     }
 
     const svg = `<?xml version="1.0" encoding="UTF-8"?>\n` +

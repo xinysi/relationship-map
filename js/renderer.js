@@ -336,8 +336,113 @@ const Renderer = {
     }
   },
 
+  /* ---------- 社区折叠视图（大图：社区 → 超节点，点击展开/收起） ---------- */
+  foldState: { on: false, cache: null },
+
+  ensureFoldData() {
+    const ps = GraphStore.persons, rs = GraphStore.relations;
+    const fp = ps.length + '|' + rs.length + '|' + (ps[ps.length - 1] ? ps[ps.length - 1].id : '') + '|' + (rs[rs.length - 1] ? rs[rs.length - 1].id : '');
+    if (this.foldState.cache && this.foldState.cache.fp === fp) return this.foldState.cache;
+    const comms = Community.detect(ps, rs); // id→社区索引
+    const byIdx = {};
+    ps.forEach((p, i) => { const c = comms.get(p.id) ?? 0; (byIdx[c] = byIdx[c] || []).push(p); });
+    const groups = [];
+    Object.keys(byIdx).sort((a, b) => (+a) - (+b)).forEach(k => groups.push(byIdx[k]));
+    const members = new Map();
+    groups.forEach((list, i) => list.forEach(p => members.set(p.id, i)));
+    const edges = [];
+    rs.forEach(r => edges.push([members.get(r.sourceId), members.get(r.targetId)]));
+    const cache = { fp, groups, edges, members };
+    this.foldState.cache = cache;
+    return cache;
+  },
+
+  foldMeta() {
+    const d = this.ensureFoldData();
+    return d.groups.map((list, i) => {
+      let cx = 0, cy = 0;
+      list.forEach(p => { cx += p.x; cy += p.y; });
+      const size = list.length;
+      const main = list.slice().sort((a, b) => (b.relations || 0) - (a.relations || 0))[0] || list[0];
+      return { idx: i, cx: cx / size, cy: cy / size, size, name: main ? main.name : '社区' };
+    });
+  },
+
+  foldHitAt(sx, sy) {
+    const meta = this.foldMeta();
+    for (let i = meta.length - 1; i >= 0; i--) {
+      const m = meta[i];
+      const r = this.foldRadius(m) * this.view.scale + 6;
+      const X = m.cx * this.view.scale + this.view.x, Y = m.cy * this.view.scale + this.view.y;
+      if ((sx - X) * (sx - X) + (sy - Y) * (sy - Y) <= r * r) return m;
+    }
+    return null;
+  },
+
+  foldRadius(m) { return Math.min(90, 26 + Math.sqrt(m.size) * 7); },
+
+  toggleFold(value) {
+    this.foldState.on = value != null ? !!value : !this.foldState.on;
+    this.requestDraw();
+  },
+
+  _drawFolded(ctx, view, w, h, opts) {
+    const th = this.theme;
+    const d = this.ensureFoldData();
+    const meta = this.foldMeta();
+    const fs = opts.forExport ? view.scale : 1;
+    // 跨社区聚合边
+    const pairCount = new Map();
+    for (const [a, b] of d.edges) {
+      if (a == null || b == null || a === b) continue;
+      const k = a < b ? a + '|' + b : b + '|' + a;
+      pairCount.set(k, (pairCount.get(k) || 0) + 1);
+    }
+    ctx.setLineDash([6, 5]);
+    for (const [k, c] of pairCount) {
+      const [ia, ib] = k.split('|').map(Number);
+      const A = meta[ia], B = meta[ib];
+      if (!A || !B) continue;
+      ctx.strokeStyle = th.edge;
+      ctx.globalAlpha = Math.min(0.85, 0.35 + c * 0.08);
+      ctx.lineWidth = Math.min(3, 1 + c * 0.25) * fs;
+      ctx.beginPath();
+      ctx.moveTo(A.cx * view.scale + view.x, A.cy * view.scale + view.y);
+      ctx.lineTo(B.cx * view.scale + view.x, B.cy * view.scale + view.y);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+    // 超节点
+    for (const m of meta) {
+      const X = m.cx * view.scale + view.x, Y = m.cy * view.scale + view.y;
+      const r = this.foldRadius(m) * view.scale;
+      if (X + r < -60 || X - r > w + 60 || Y + r < -60 || Y - r > h + 60) continue;
+      const color = Utils.colorForGroup((d.groups[m.idx][0] || {}).group) || th.nodeBorder;
+      ctx.beginPath(); ctx.arc(X, Y, r, 0, Math.PI * 2);
+      ctx.fillStyle = th.nodeFill; ctx.fill();
+      ctx.strokeStyle = color; ctx.lineWidth = Math.max(1.6, r * 0.08); ctx.stroke();
+      ctx.fillStyle = color;
+      ctx.globalAlpha = 0.85;
+      ctx.font = '600 ' + Math.max(13, r * 0.42) + 'px "Microsoft YaHei", sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const label = (m.name || '').slice(0, 6) + (m.name.length > 6 ? '…' : '');
+      ctx.fillText(label, X, Y - r * 0.28);
+      ctx.font = Math.max(11, r * 0.26) + 'px "Microsoft YaHei", sans-serif';
+      ctx.globalAlpha = 0.75;
+      ctx.fillText(m.size + (I18n.lang === 'en' ? ' ppl' : ' 人'), X, Y + r * 0.26);
+      ctx.globalAlpha = 1;
+    }
+    // 已展开社区的成员：常规绘制（缩减为仅该社区调用原绘制？简化：全量绘制会重叠折叠节点 → 过滤展开社区成员后复用常规绘制）
+  },
+
   drawScene(ctx, view, w, h, opts) {
     opts = opts || {};
+    // 社区折叠视图：大图（≥20 人）折叠为超节点，点击查看成员
+    if (!opts.forExport && this.foldState.on && GraphStore.persons.length >= 20) {
+      this._drawFolded(ctx, view, w, h, opts);
+      return;
+    }
     const th = this.theme;
     const layout = this.layoutOf(this._themeId);
     const scale = view.scale;

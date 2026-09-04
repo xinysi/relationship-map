@@ -905,3 +905,9 @@ kbd {
 .ai-g > label { font-weight: 600; font-size: 12.5px; cursor: pointer; }
 .ai-list { max-height: 110px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 4px 6px; margin-top: 4px; display: flex; flex-wrap: wrap; gap: 2px 10px; }
 .ai-item { font-size: 12px; color: var(--text); display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; cursor: pointer; }
+
+/* 社区折叠成员列表 */
+.fold-member { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: var(--radius-sm); cursor: pointer; }
+.fold-member:hover { background: var(--primary-soft); }
+.fold-member .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; }
+.fold-member .sub { color: var(--sub); font-size: 11px; margin-left: auto; }

@@ -354,6 +354,7 @@ const App = {
       case 'zoomOut': Renderer.zoomAt(Renderer.w / 2, Renderer.h / 2, 1 / 1.2); break;
       case 'resetView': Renderer.resetView(); break;
       case 'fitView': Renderer.fitView(); break;
+      case 'toggleFold': this.toggleFoldView(); break;
       case 'toggleBoxSelect':
         this.boxSelectMode = !this.boxSelectMode;
         document.getElementById('navBoxSelect').classList.toggle('active', this.boxSelectMode);
@@ -390,6 +391,34 @@ const App = {
         border = t.edge, primary = t.primary, soft = t.edge || '#e2e8f0';
       return `body[data-theme="${t.id}"]{--bg:${bg};--panel:${panel};--panel2:${t.dot || bg};--border:${border};--text:${text};--sub:${sub};--primary:${primary};--primary-h:${primary};--primary-soft:${soft};--shadow:0 6px 24px rgba(0,0,0,.35);}`;
     }).join('\n');
+  },
+
+  toggleFoldView() {
+    if (GraphStore.persons.length < 20) { this.toast(I18n.tr('至少需要 20 个人物才能使用社区折叠视图'), 'warn'); return; }
+    Renderer.toggleFold();
+    this.updateStatus();
+  },
+
+  showFoldMembers(m) {
+    const d = Renderer.ensureFoldData();
+    const list = d.groups[m.idx] || [];
+    const mm = this.openModal({
+      title: I18n.tr('社区成员') + '：' + (m.name || ''),
+      width: 420,
+      bodyHTML: '<div style="max-height:340px;overflow-y:auto">' + list.slice().sort(function (a, b) { return (a.name || '').localeCompare(b.name, 'zh'); }).map(function (p) {
+        return '<div class="fold-member" data-id="' + Utils.escapeHtml(p.id) + '"><span class="dot" style="background:' + Utils.colorForGroup(p.group) + '"></span>' + Utils.escapeHtml(p.name) + '<span class="sub">' + Utils.escapeHtml(p.group || '') + '</span></div>';
+      }).join('') + '</div>',
+      footerHTML: '<button class="btn" data-act="cancel">' + I18n.tr('关闭') + '</button>'
+    });
+    mm.body.querySelector('[data-act=cancel]').onclick = mm.close;
+    mm.body.querySelectorAll('.fold-member').forEach(el => {
+      el.onclick = () => {
+        Renderer.toggleFold(false);
+        const p = GraphStore.getPerson(el.dataset.id);
+        if (p) { GraphStore.setPinned(p.id); GraphStore.setSelection([p.id]); Renderer.centerOn(p.x, p.y); this.renderDetailPanel(); }
+        mm.close();
+      };
+    });
   },
 
   exportThemes(ids) {
@@ -561,6 +590,11 @@ const App = {
     const hideTooltip = () => tooltip.classList.add('hidden');
 
     canvas.addEventListener('mousedown', (e) => {
+      if (Renderer.foldState.on) {
+        const rect = canvas.getBoundingClientRect();
+        const fm = Renderer.foldHitAt(e.clientX - rect.left, e.clientY - rect.top);
+        if (fm) { this.showFoldMembers(fm); return; }
+      }
       hideCtxMenu();
       const p = pos(e);
       startX = lastX = p.x; startY = lastY = p.y;

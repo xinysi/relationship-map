@@ -129,7 +129,30 @@ const SampleData = {
     { id: 'n15', name: '贝蒂', group: '当代·长夜归', position: '图书馆员', tag: ['旧报'], intro: '镇图书馆员，管理 1893 年“火灾专档”，只允许“被灰猫带来的人”翻阅。' },
     { id: 'n16', name: '詹米', group: '当代·长夜归', position: '高中生', tag: ['狗'], intro: '高中生，傍晚牵三眼猎犬散步，犬在霍桑宅门口坐成一尊石像。' },
     { id: 'n17', name: '诺拉', group: '当代·长夜归', position: '巡警', tag: ['夜班'], intro: '夜班巡警，午夜巡逻时总在时钟 13 响的瞬间到岗——虽然钟最多只敲 12 下。' },
-    { id: 'n18', name: '奥托', group: '当代·长夜归', position: '咖啡店主', tag: ['常客'], intro: '老宅对面咖啡店老板，给侦探留窗边的位置，说“那桌能看到阁楼的灯”。' }
+    { id: 'n18', name: '奥托', group: '当代·长夜归', position: '咖啡店主', tag: ['常客'], intro: '老宅对面咖啡店老板，给侦探留窗边的位置，说“那桌能看到阁楼的灯”。' },
+
+    /* ---- 番外扩展（33—42 卷）---- */
+    { id: 'x1', name: '小陌', group: '当代·长夜归', position: '档案馆管理员 · 白水渡掌簿', tag: ['对账者', '数盐', '白水渡'], intro: '本名杜陌（2006-04-14 生），2029 年接任幽庭镇档案馆；2034 年赴白水渡之约，接外婆杜阿久的对年簿，是为「对账者」——一生把两本账（收与还）放上一张桌。' },
+    { id: 'x2', name: '哈珀', group: '当代·长夜归', position: '档案馆管理员', tag: ['前任', '接灯人'], intro: '因一张灯笼照片辞去市职来考镇岗；2025—2028 值馆，留下钥匙套规矩。' },
+    { id: 'x3', name: '洛', group: '当代·长夜归', position: '镇志编修', tag: ['盐灯话', '传承'], intro: '六岁在灯笼下听「后来都好了」，601 笔井字的画下人，2045 年编成镇志。' },
+    { id: 'x4', name: '说书人', group: '超自然·引路', position: '讲三回书的人', tag: ['灯下', '故事'], intro: '2029 年起在镇口灯笼下讲三回书，末一句永远是「后来，都好了」。' },
+    { id: 't23', name: '布克', group: '渔镇·码头', position: '渔夫/消防员/木匠', tag: ['三次证言'], intro: '老科迪的侄子；1942 见两骑，1977 扑孤儿院火，2027 证「尾巴上的银线」。' },
+    { id: 't24', name: '迪伦二世', group: '渔镇·邮路', position: '邮差', tag: ['等信'], intro: '迪伦一世之侄；一生未见「未来收信人」那封信，每年 10-13 去图书馆看名册。' },
+    { id: 't25', name: '哈里斯', group: '渔镇·塔灯', position: '守灯人', tag: ['第三代'], intro: '1890 年接班的第三代守灯人；1893 火夜笔记八页压在塔基砖下，后交予雾。' },
+    { id: 't26', name: '塔尔', group: '渔镇·塔灯', position: '守灯人', tag: ['侄子'], intro: '1902—1925 守塔；「我三周换一次油，换油的时候它就是自己亮。」' },
+    { id: 't27', name: '谷仓婶', group: '渔镇·谷仓', position: '看仓人', tag: ['目击者'], intro: '1955 平账夜前夜，「十床病人排队走进雾中」的唯一民间目击者，证词入蓝皮书 55。' },
+    { id: 't28', name: '冈特女儿', group: '1793·旅店', position: '旅店帮手/店主', tag: ['旅店'], intro: '1893 年送烛姑娘；1903 年在镜框夹层找到四份讣告——实为四份生辰单。' },
+    /* ---------- 白水渡（第二部：46—58 卷） ---------- */
+    { id: 'x50', name: '白铃', group: '白水渡·还井', position: '白家 · 灯/记', tag: ['2006-04-14', '数花', '听月灯'], intro: '白锤之女，与杜陌同年同月同日生；白水渡「白」家的接灯人，掌白日记，听过月灯「眨」过一眼。' },
+    { id: 'x51', name: '洛', group: '白水渡·还家', position: '还家后人 · 界行者', tag: ['2023 生', '记步账', '光籽守塔'], intro: '还家后代（杜还之裔），十六岁送灰灯还家；开《界行记》，七年二百余万步，与光籽共守白钟，2061 年替钟落「响」字。' },
+    { id: 'x52', name: '老洛', group: '白水渡·码头', position: '摆渡人 · 立界者', tag: ['界篙', '白水谣', '1936 生'], intro: '白水渡艄公，说「洛不是姓，是码头」；渡人渡灯一生，2039-02-01 立「界」篙，2050-02-01 逝于界篙一丈外，坟头朝河。' },
+    { id: 'x53', name: '白锤', group: '白水渡·铁匠', position: '白家旁支 · 铁匠', tag: ['界尺', '同心环', '量圈两百步'], intro: '白水渡铁匠铺之主；打界尺、账匣、同心环，量出环城圈两百步；孙女白响、孙白念。' },
+    { id: 'x54', name: '祈姑', group: '白水渡·饭馆', position: '饭馆掌柜', tag: ['数盐', '有饭'], intro: '「有饭」饭馆掌柜，教小陌数盐——「盐不会说谎」；一支四十多年舍不得用的陪嫁笔，最后落成了「响」字。' },
+    { id: 'x55', name: '白史', group: '白水渡·镇公所', position: '文员/户籍', tag: ['认簿', '观年'], intro: '镇公所老文员，「白」字头的守门人——守账、守簿、守「白水渡的白」；卸职时把钟图交掌簿人，一生只等「白」字自己亮。' },
+    { id: 'x56', name: '杜阿久', group: '白水渡·杜家', position: '杜家掌簿', tag: ['1939 接簿', '对年六十年', '埋水脉'], intro: '小陌的外婆，1939—2024 掌白水渡对年六十年；死前埋井水脉、留「年」珠与信，留下一句「还账不还人，账清了，人回来」。' },
+    { id: 'x57', name: '杜还（还一）', group: '白水渡·还家', position: '还家长子', tag: ['1893 送', '少年', '影子还归'], intro: '1893-10-12 被灰衣送走的还家少年，走了 163 年；以「影子」还归环门，留灰叶「人到，字成，谢」——「人」字最后一捺由此落成。' },
+    { id: 'x58', name: '白响', group: '白水渡·新一代', position: '传夜人 · 接簿', tag: ['2069-10 生', '七夜', '响念传替'], intro: '白锤孙女，名「响」——与白钟同字；九岁听七夜口述知「当」，立传夜规，十六岁起替全镇传「响念传」，2091 年接对年簿。' },
+    { id: 'x59', name: '白念', group: '白水渡·新一代', position: '念簿', tag: ['2078-12 生', '记念'], intro: '白响之弟，名「念」；记「念簿」，与姐姐一「常」一「念」，支撑白水渡「双笔」；镇训三字（响念传）由姐弟相守。' }
   ],
 
   relations: [
@@ -284,7 +307,32 @@ const SampleData = {
     { sourceId: 'a7', targetId: 'n10', relationType: '关联', desc: '第七封信送至执行者手中', strength: 8, time: '2026' },
     { sourceId: 'a1', targetId: 's3', relationType: '盟友', desc: '七爷与船夫的最后交易', strength: 8, time: '2026' },
     { sourceId: 'n1', targetId: 'a1', relationType: '救赎', desc: '七爷替她挡下“换命”的代价', strength: 9, time: '2026' },
-    { sourceId: 'n2', targetId: 'g2', relationType: '敌对', desc: '侦探以真话为渡船之票', strength: 8, time: '2026' }
+    { sourceId: 'n2', targetId: 'g2', relationType: '敌对', desc: '侦探以真话为渡船之票', strength: 8, time: '2026' },
+
+    /* ---- 番外扩展关系 ---- */
+    { sourceId: 'x1', targetId: 'x2', relationType: '师徒', desc: '接任移交钥匙套', strength: 9, time: '2028' },
+    { sourceId: 'x2', targetId: 'x1', relationType: '关联', desc: '引路人', strength: 7, time: '2028' },
+    { sourceId: 'x1', targetId: 'a12', relationType: '盟友', desc: '月认的管事人', strength: 8, time: '2028' },
+    { sourceId: 'x4', targetId: 'x3', relationType: '创造', desc: '三回书启蒙', strength: 7, time: '2029' },
+    { sourceId: 'x4', targetId: 'g15', relationType: '关联', desc: '灯下讲书', strength: 6, time: '2029' },
+    { sourceId: 't23', targetId: 't9', relationType: '叔侄', desc: '科迪之侄', strength: 8, time: '1942' },
+    { sourceId: 't24', targetId: 't13', relationType: '叔侄', desc: '迪伦一世之侄', strength: 8, time: '1945' },
+    { sourceId: 't25', targetId: 's3', relationType: '盟友', desc: '塔与船', strength: 6, time: '1900' },
+    { sourceId: 't26', targetId: 't25', relationType: '叔侄', desc: '接塔', strength: 8, time: '1902' },
+    { sourceId: 't27', targetId: 'w2', relationType: '关联', desc: '证词入蓝皮书', strength: 6, time: '1955' },
+    /* ---- 白水渡（第二部）---- */
+    { sourceId: 'x56', targetId: 'x1', relationType: '祖孙', desc: '外婆与掌簿人——「还账不还人，账清了，人回来」', strength: 10, time: '2006' },
+    { sourceId: 'h3', targetId: 'x57', relationType: '送别', desc: '灰衣 1893-10-12 送还家少年；「他带着戒指走的，戒指回来，他就回来」', strength: 10, time: '1893' },
+    { sourceId: 'x57', targetId: 'x51', relationType: '血脉', desc: '还家祖裔——杜还之影留「人到，字成，谢」，洛接「响」字', strength: 10, time: '1893—2054' },
+    { sourceId: 'x52', targetId: 'x51', relationType: '授业/界行', desc: '老洛立界篙，洛接班界行，「界上的人，两头都算」', strength: 9, time: '2039—2050' },
+    { sourceId: 'x53', targetId: 'x50', relationType: '父女', desc: '白锤之女，掌灯与记（白日记）', strength: 9, time: '2006—' },
+    { sourceId: 'x53', targetId: 'x58', relationType: '祖孙', desc: '爷爷与「白响」——「响字的头一回，是孙女写的」', strength: 9, time: '2069—' },
+    { sourceId: 'x58', targetId: 'x59', relationType: '姐弟', desc: '响与念——「响念传替」姐弟双笔', strength: 9, time: '2078—' },
+    { sourceId: 'x50', targetId: 'x1', relationType: '同岁', desc: '2006-04-14 同日生；一记一过，「白」与「账」', strength: 9, time: '2006—' },
+    { sourceId: 'x54', targetId: 'x1', relationType: '授盐', desc: '祈姑教数盐——盐不会说谎；陪嫁笔成「响」字', strength: 8, time: '2034—' },
+    { sourceId: 'x55', targetId: 'x1', relationType: '授簿', desc: '白史守门半生——「白字不是门，是路」', strength: 8, time: '2034—2050' },
+    { sourceId: 'x1', targetId: 'x51', relationType: '坐簿与记', desc: '小陌掌簿，洛记步——两账一对', strength: 8, time: '2049—' },
+    { sourceId: 'n1', targetId: 'x1', relationType: '认位', desc: '伊芙琳付名认位——「钟不响，我不来；响了，我来画那一横」', strength: 10, time: '2035—2061' }
   ],
 
   events: [
@@ -317,5 +365,7 @@ const SampleData = {
     { title: '黎明解除', time: '2026-02-09', era: '黎明', desc: '雨果以一句真话换渡船，蝴蝶引两人回到 1893 年的那晚；烧掉契约，长夜结束。', persons: ['雨果·克劳斯', '伊芙琳·格里姆', '蝶妖', '忘川船夫'] },
     { title: '第七封信寄出', time: '2026-02-14', era: '黎明', desc: '金翅雀信使衔走最后一封“第七封信”；贝蒂在专档末页盖上“已阅”。', persons: ['金翅雀信使', '贝蒂', '灰衣女士'] },
     { title: '小镇的早晨', time: '2026-02-15', era: '黎明', desc: '钟楼只敲十二下，铁链声停，井水清澈；伊芙琳在门口放了两碗牛奶。', persons: ['伊芙琳·格里姆', '灰猫幼崽月', '猫头鹰守夜人'] }
-  ]
+,
+    { title: '白钟当', time: '2061-12-21', era: '白水渡·合年', desc: '冬至暮色，白钟落「当」——白水渡两百年头一响；小陌落第五页「响」字。', persons: ['杜陌', '洛', '白铃', '伊芙琳·格里姆', '白锤', '祈姑'] },
+    { title: '回幽庭', time: '2090-05-01 至 06-30', era: '白水渡·终卷', desc: '八十四岁的小陌回幽庭：旧井、灰衣老屋、档案馆、满月备忘录——两镇一家的最后一回。', persons: ['杜陌', '白响', '伊芙琳·格里姆'] }  ]
 };

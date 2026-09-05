@@ -119,7 +119,9 @@ JSON 结构（字段与「标准导入模板」一致）：
     } else if (msg.content != null) {
       content = String(msg.content);
     }
-    return { content, finishReason: (data.choices && data.choices[0] && data.choices[0].finish_reason) || '' };
+    // 推理型模型（deepseek-reasoner 等）会把正文写在 reasoning_content，content 为空
+    const reasoning = String(msg.reasoning_content || '').replace(/\s+/g, ' ').slice(0, 300);
+    return { content, finishReason: (data.choices && data.choices[0] && data.choices[0].finish_reason) || '', reasoning };
   },
 
   /* 用户消息：截断超长文本 */
@@ -151,7 +153,16 @@ JSON 结构（字段与「标准导入模板」一致）：
       if (!parsed) {
         const head = String(content || '').replace(/\s+/g, ' ').slice(0, 80);
         const diag = `诊断：首次返回 ${first.content.length} 字符（finish=${first.finishReason || '无'}），重试返回 ${second.content.length} 字符（finish=${second.finishReason || '无'}）`;
-        throw new Error(`AI 返回内容无法解析为 JSON，请重试。${diag}。返回开头：「${head || '（空）'}…」。若反复失败请换模型（确认支持 JSON 输出）或缩短文本`);
+        let hint = '';
+        if (first.reasoning || second.reasoning) {
+          const rc = (first.reasoning || second.reasoning).slice(0, 200);
+          hint = `该模型返回的是"推理内容"而非正文（疑似推理型模型，如 deepseek-reasoner），请在设置中改用 chat 类模型（deepseek-chat 等）或缩短文本；推理片段：「${rc}…」`;
+        } else if ((first.finishReason || '') === 'length' || (second.finishReason || '') === 'length') {
+          hint = '模型输出被截断（finish=length）：文本过长或超出单次输出上限，请分段提取（每段建议 3000~8000 字）。';
+        } else if (second.content.length === 0 && first.content.length === 0) {
+          hint = '模型两条路径都返回空正文：请确认模型支持 JSON 输出并已正确配置服务地址/密钥；若为本地模型请确认已加载。';
+        }
+        throw new Error(`AI 返回内容无法解析为 JSON，请重试。${diag}。返回开头：「${head || '（空）'}…」。${hint}` || `AI 返回内容无法解析为 JSON，请重试。${diag}。返回开头：「${head || '（空）'}…」。若反复失败请换模型（确认支持 JSON 输出）或缩短文本`);
       }
     }
     if (onProgress) onProgress(0.85, '解析完成');

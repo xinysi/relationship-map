@@ -993,7 +993,9 @@ const DataIO = {
           }
           return -1;
         };
-        const pieces = itemText.split(/([×↔→])/);
+        // 剔除内部 ID 链条注记（如"g10→h3 恋人"），避免被 → 分隔符误拆成畸形名字
+        const itemTextClean = itemText.replace(/[（(][^）)]*[a-z]\d+\s*[→×↔]\s*[a-z]\d+[^）)]*[）)]/g, '').replace(/[a-z]\d+\s*[→×↔]\s*[a-z]\d+/g, '').replace(/[；;]\s*[；;]+/g, '；').trim();
+        const pieces = itemTextClean.split(/([×↔→])/);
         const names = [], seps = [];
         for (let pi = 0; pi < pieces.length; pi++) {
           if (pieces[pi] === '×' || pieces[pi] === '↔' || pieces[pi] === '→') { seps.push(pieces[pi]); continue; }

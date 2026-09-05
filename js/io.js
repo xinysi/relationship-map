@@ -514,6 +514,8 @@ const DataIO = {
 
     const findOrCreate = (nameRaw, opts) => {
       opts = opts || {};
+      // 别名归一（去重）："小陌、小陌" → "小陌"
+      const normalize = s => s ? [...new Set(String(s).split(/[、,，/；;]+/).map(x => x.trim()).filter(Boolean))].join('、') : '';
       let s = cleanText(nameRaw);
       // 人名清洗：剥离引号；全角斜杠分隔的别名（"恶魔"（Demon）／父亲 → 恶魔 / 别名Demon、父亲）
       s = s.replace(/["“”„«»「」『』]/g, '').trim();
@@ -527,13 +529,19 @@ const DataIO = {
       const en = s.match(/[（(]\s*([A-Za-z][A-Za-z0-9 .·''-]*)\s*[）)]\s*$/);
       if (en) { alias = alias ? alias + '、' + en[1].trim() : en[1].trim(); s = s.slice(0, en.index).trim(); }
       s = stripMetaParens(s).replace(/[。；;]/g, '').trim();
-      // 中文括号小名："杜陌（小陌）"→ 名"杜陌"、别名"小陌"；"老韩(韩福)""安（杜还）"同理（归一化名+别名）
-      const cnAlias = /[（(]([\u4e00-\u9fff]{1,4})[）)]\s*$/;
-      const am = s.match(cnAlias);
+      // 括号别名（两种写法）："（别名：小陌）"与"（小陌）"→ 名"杜陌"、别名"小陌"
+      let am = s.match(/[（(](别名[:：]\s*([^）)]+))[）)]\s*$/);
       if (am) {
-        alias = (alias ? alias + '、' : '') + am[1];
+        alias = (alias ? alias + '、' : '') + am[2].trim();
         s = s.slice(0, s.lastIndexOf(am[0])).trim();
         if (!s) return null;
+      } else {
+        am = s.match(/[（(]([\u4e00-\u9fff]{1,4})[）)]\s*$/);
+        if (am) {
+          alias = (alias ? alias + '、' : '') + am[1];
+          s = s.slice(0, s.lastIndexOf(am[0])).trim();
+          if (!s) return null;
+        }
       }
       if (!s || s.length > 24 || GENERIC_NAME.test(s)) return null;
       if (opts.nameOnly) return { name: s, alias };
@@ -569,14 +577,14 @@ const DataIO = {
         if (s.includes(p.name) && s.length > p.name.length) {
           p.name = s; seen.set(s, p);
         }
-        if (!p.alias && (alias || opts.alias)) p.alias = alias || opts.alias;
+        if (!p.alias && (alias || opts.alias)) p.alias = normalize(p.alias || (alias || opts.alias));
         if (!p.intro && opts.intro) p.intro = opts.intro;
         return p;
       }
       seq++;
       p = {
         id: callToken + seq,
-        name: s, alias: alias || (opts.alias || ''),
+        name: s, alias: normalize(alias || (opts.alias || '')),
         intro: opts.intro || '',
         group: opts.group || group || defaultGroup,
         tag: opts.tag || []
@@ -985,10 +993,10 @@ const DataIO = {
           }
           return -1;
         };
-        const pieces = itemText.split(/([×↔])/);
+        const pieces = itemText.split(/([×↔→])/);
         const names = [], seps = [];
         for (let pi = 0; pi < pieces.length; pi++) {
-          if (pieces[pi] === '×' || pieces[pi] === '↔') { seps.push(pieces[pi]); continue; }
+          if (pieces[pi] === '×' || pieces[pi] === '↔' || pieces[pi] === '→') { seps.push(pieces[pi]); continue; }
           const seg2 = pieces[pi];
           if (!seg2.trim()) continue;
           const colonIdx = findTopColon(seg2);
@@ -1039,6 +1047,20 @@ const DataIO = {
       const bold = itemText.match(/^\*\*(.+?)\*\*\s*[:：]?\s*(.*)$/);
       if (bold) {
         pName = bold[1]; pIntro = (bold[2] || '').trim();
+        // 加粗名后紧跟的别名写法："**杜陌**（别名：小陌）"
+        const alOut = itemText.match(/^\*\*[^*]+\*\*\s*[（(]别名[:：]\s*([^）)]+)[）)]/);
+        if (alOut) pAlias = (pAlias ? pAlias + '、' : '') + alOut[1].trim();
+        // 元信息括号内含别名："**灰衣女士**（h3；…；别名：伊莱扎·霍桑）"
+        {
+          const alIdx = (pIntro || '').indexOf('别名');
+          if (alIdx >= 0) {
+            const mm = pIntro.slice(alIdx).match(/别名[:：]\s*([^，,；;)）]+)/);
+            if (mm) {
+              pAlias = (pAlias ? pAlias + '、' : '') + mm[1].trim();
+              pIntro = (pIntro.slice(0, alIdx) + pIntro.slice(alIdx + mm[0].length)).replace(/[；;]\s*[；;]*/g, '；').replace(/^\s*[；;]\s*|;\s*$/g, '').trim();
+            }
+          }
+        }
       } else {
         // 括号深度感知定位第一个 ——/—/：/: 分隔符，人名长度不受限
         let depth = 0, sepIdx = -1;
@@ -1055,7 +1077,17 @@ const DataIO = {
       }
       if (pName) {
         // 括注处理：剥离部数/图鉴等元信息，保留地域/称号限定词（如"斯通韦尔"、"伯爵"）
-        const qual = pName.match(/[（(]([^）)]*)[）)]\s*$/);
+        let qual = pName.match(/[（(]([^）)]*)[）)]\s*$/);
+        // 元信息内「别名：X」→ 直接作为别名（如"（h3；…；别名：伊莱扎·霍桑）"）
+        if (qual && /别名[:：]/.test(qual[1])) {
+          const alM = qual[1].match(/别名[:：]\s*([^；,，）)]+)/);
+          if (alM) {
+            pAlias = (pAlias ? pAlias + '、' : '') + alM[1].trim();
+            pName = pName.replace(/；?\s*别名[:：][^；,，）)]+/, '').trim();
+            pName = pName.replace(/[；;]\s*$/, '').trim();
+            qual = pName.match(/[（(]([^）)]*)[）)]\s*$/);
+          }
+        }
         let cleaned = cleanText(pName).replace(/[（(][^）)]*[）)]\s*$/, '').trim();
         let keep = '';
         if (qual) {

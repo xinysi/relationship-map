@@ -163,7 +163,7 @@ rwgxw/
 ├── js/
 │   ├── vendor/xlsx.full.min.js  # SheetJS 离线库（Excel 解析）
 │   ├── utils.js            # 通用工具
-│   ├── sample-data.js      # 内置示例数据（项目示例总览 · 253 人物/229 关系/205 事件；由 sl/ 项目示例文件经解析器生成）
+│   ├── sample-data.js      # 内置示例数据（全系列整理总览 · 168 人物/212 关系/237 事件；由 sl/ 项目示例文件经解析器生成，别名自动归一）
 │   ├── model.js            # 数据模型（CRUD/撤销重做/筛选/溯源/时间线事件）
 │   ├── community.js        # Louvain 社区发现（自动分簇布局）
 │   ├── analysis.js         # 图分析（最短路径 / 度中心性 / Brandes 介数中心性）

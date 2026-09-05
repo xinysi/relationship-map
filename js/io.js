@@ -527,6 +527,14 @@ const DataIO = {
       const en = s.match(/[（(]\s*([A-Za-z][A-Za-z0-9 .·''-]*)\s*[）)]\s*$/);
       if (en) { alias = alias ? alias + '、' + en[1].trim() : en[1].trim(); s = s.slice(0, en.index).trim(); }
       s = stripMetaParens(s).replace(/[。；;]/g, '').trim();
+      // 中文括号小名："杜陌（小陌）"→ 名"杜陌"、别名"小陌"；"老韩(韩福)""安（杜还）"同理（归一化名+别名）
+      const cnAlias = /[（(]([\u4e00-\u9fff]{1,4})[）)]\s*$/;
+      const am = s.match(cnAlias);
+      if (am) {
+        alias = (alias ? alias + '、' : '') + am[1];
+        s = s.slice(0, s.lastIndexOf(am[0])).trim();
+        if (!s) return null;
+      }
       if (!s || s.length > 24 || GENERIC_NAME.test(s)) return null;
       if (opts.nameOnly) return { name: s, alias };
       let p = seen.get(s);
@@ -546,6 +554,12 @@ const DataIO = {
         for (const tk of tokens) {
           for (const [k, v] of seen) {
             if (k.split('·')[0] === tk) { p = v; break; }
+          }
+          if (!p) {
+            // 别名串匹配：已有条目的别名中含该 token 也视为同一人
+            for (const v of seen.values()) {
+              if ((v.alias || '').split(/[、,，/／\s|：:]/).includes(tk)) { p = v; break; }
+            }
           }
           if (p) break;
         }

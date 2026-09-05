@@ -793,20 +793,21 @@ const DataIO = {
           if (!title) continue;
           events.push({ id: '', title: title, time: '', order, era: subsection || '因果序', desc: stripMd(r[2] || ''), persons: [] });
         }
-      } else if (stripMd(header[0]) === '部' && header.join('|').includes('登场人物')) {
+      } else if (header.some(h2 => /登场人物/.test(stripMd(h2)))) {
+        // 登场速览表（表头含"主要登场人物"）：每部/卷一条卷目事件，不建人
         for (const r of body) {
           const m = stripMd(r[0]).match(/^(\d+)\s*(.*)$/);
           const num = m ? m[1] : '', nm = m ? m[2] : stripMd(r[0]);
           if (!nm) continue;
           events.push({
-            id: '', title: `第${num}部《${nm}》`, time: '', order: Number(num) || 0,
+            id: '', title: `第${num ? num + '部' : ''}《${nm}》`, time: '', order: Number(num) || 0,
             era: '各部登场速览',
-            desc: `主要登场人物：${stripMd(r[1] || '')}${r[2] ? '；与格雷家的关系：' + stripMd(r[2]) : ''}`,
+            desc: `主要登场人物：${stripMd(r[1] || '')}${r[2] ? '；与主线的关系：' + stripMd(r[2]) : ''}`,
             persons: []
           });
         }
       } else if (header.some(h2 => /姓名|人物|名字|角色/.test(stripMd(h2)))) {
-        // 通用人物表：首列为姓名，其余列并入简介
+        // 通用人物表：首列为姓名，其余列并入简介（走 findOrCreate 自动分配 ID 与合并）
         for (const r of body) {
           const nm = stripMd(r[0] || '').trim();
           if (!nm || nm.length > 20) continue;
@@ -814,7 +815,7 @@ const DataIO = {
             const v = stripMd(r[i3 + 1] || '');
             return v ? h2 + '：' + v : '';
           }).filter(Boolean).join('；');
-          persons.push({ id: '', name: nm, alias: '', intro: desc2, group: group || defaultGroup, tag: [] });
+          findOrCreate(nm, { group: group || defaultGroup, intro: desc2 });
         }
       } else skipped += body.length;
     };
@@ -1589,7 +1590,7 @@ const DataIO = {
 
     return {
       persons,
-      relations: deduped.map(r => this._objToRelation(r)),
+      relations: deduped.filter(r => r && r.sourceId && r.targetId).map(r => this._objToRelation(r)),
       events: events.map(e => this._objToEvent(e)),
       errors,
       infos,

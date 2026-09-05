@@ -2,6 +2,8 @@
 /* ================= AI 智能提取（LLM，OpenAI 兼容 API） =================
    任意小说/剧本文本 → LLM 结构化抽取（人物/关系/时间线事件）→ 复用导入管线应用。
    服务地址与密钥由用户在设置中配置，仅存本机；
+   API 密钥使用 Web Crypto（AES-GCM 256 + PBKDF2 派生）加密后写入 localStorage，
+   明文不落盘，同一明文仅存在于本次会话内存；
    注意：此功能会把文本发送到用户配置的第三方 AI 服务（数据出网）。
 ------------------------------------------------ */
 const LlmExtract = {
@@ -23,16 +25,120 @@ const LlmExtract = {
     llmKey: ''
   },
 
+  /* ============ API 密钥加密存储 ============
+     密钥不落盘：写入 localStorage 前用 Web Crypto 加密（AES-GCM 256，
+     密钥由固定应用盐 + 每次保存随机盐经 PBKDF2(12万次) 派生；输出
+     v1.<salt>.<iv>.<密文，均为 base64>）。
+     加载时解密到内存 _memKey，刷新后重新解密；
+     旧版本存下的明文 llmKey 首次加载时自动加密迁移并清空明文。
+     说明：这是浏览器本地混淆级保护（密钥仍在本机），请勿在公共电脑保存。 */
+
+  _memKey: '',
+  _keyLoaded: false,
+
+  _b64(buf) {
+    return btoa(String.fromCharCode.apply(null, new Uint8Array(buf)));
+  },
+  _unb64(str) {
+    const bin = atob(str);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  },
+  _cryptoOk() {
+    return !!(globalThis.crypto && globalThis.crypto.subtle);
+  },
+
+  /* 固定应用盐 + 随机盐 → AES-GCM 密钥（随机盐随密文一起存，每次保存不同）
+     注意：接口用于加密/解密同一密钥值，派生参数变化会导致旧密文失效 */
+  async _deriveKey(salt) {
+    if (!this._cryptoOk()) return null;
+    const material = await crypto.subtle.importKey(
+      'raw', new TextEncoder().encode('rwgxw-llm-key-v1'), 'PBKDF2', false, ['deriveKey']
+    );
+    return crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt, iterations: 120000, hash: 'SHA-256' },
+      material,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt', 'decrypt']
+    );
+  },
+
+  async _encryptKey(plain) {
+    if (!plain || !this._cryptoOk()) return '';
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const key = await this._deriveKey(salt);
+    const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(plain));
+    return 'v1.' + this._b64(salt) + '.' + this._b64(iv) + '.' + this._b64(ct);
+  },
+
+  async _decryptKey(enc) {
+    if (!enc || !this._cryptoOk()) return '';
+    const parts = String(enc).split('.');
+    if (parts.length !== 4 || parts[0] !== 'v1') return '';
+    try {
+      const key = await this._deriveKey(this._unb64(parts[1]));
+      const pt = await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: this._unb64(parts[2]) }, key, this._unb64(parts[3])
+      );
+      return new TextDecoder().decode(pt);
+    } catch (e) {
+      return '';
+    }
+  },
+
+  /* 解密/迁移密钥到内存；应用启动时调用一次即可 */
+  async _loadKey() {
+    if (this._keyLoaded) return;
+    this._keyLoaded = true;
+    const s = ProjectStore.loadSettings();
+    if (s.llmKeyEnc) {
+      this._memKey = await this._decryptKey(s.llmKeyEnc);
+    } else if (s.llmKey) {
+      // 旧版明文密钥 → 自动加密迁移（saveSettings 内会写入 llmKeyEnc 并清空明文）
+      this._memKey = s.llmKey;
+      try { await this.saveSettings({ llmKey: s.llmKey }); }
+      catch (e) { /* 迁移失败不阻塞使用 */ }
+    }
+  },
+
   settings() {
     const s = ProjectStore.loadSettings();
     return Object.assign({}, this.DEFAULT, {
       llmBase: s.llmBase || this.DEFAULT.llmBase,
       llmModel: s.llmModel || this.DEFAULT.llmModel,
-      llmKey: s.llmKey || ''
+      llmKey: this._memKey || (s.llmKey || '')
     });
   },
 
-  saveSettings(patch) {
+  /* patch.llmKey 语义：
+     未传 → 不修改密钥；
+     非空字符串 → 加密后写入 llmKeyEnc（明文不落盘）；
+     空字符串 → 清除已存密钥。
+     非安全上下文（无 Web Crypto，如 file:// 直接打开）时才退回明文存储并提示。 */
+  async saveSettings(patch) {
+    patch = Object.assign({}, patch);
+    if (patch.llmKey !== undefined) {
+      const plain = String(patch.llmKey || '').trim();
+      this._memKey = plain;
+      patch.llmKey = '';
+      if (plain) {
+        if (this._cryptoOk()) {
+          patch.llmKeyEnc = await this._encryptKey(plain);
+        } else {
+          if (!this._warnedNoCrypto) {
+            this._warnedNoCrypto = true;
+            console.warn('[LlmExtract] 当前页面环境不支持 Web Crypto（需 https 或 http://localhost）：API 密钥无法加密，仅保存明文。');
+          }
+          patch.llmKey = plain;
+          patch.llmKeyEnc = '';
+        }
+      } else {
+        patch.llmKeyEnc = '';
+      }
+    }
     ProjectStore.saveSettings(patch);
   },
 
@@ -135,6 +241,7 @@ JSON 结构（字段与「标准导入模板」一致）：
 
   /* 调用 OpenAI 兼容 chat/completions，返回提取结果 {persons, relations, events, raw, truncated} */
   async extract(text, onProgress) {
+    await this._loadKey();
     const s = this.settings();
     if (!String(text || '').trim()) throw new Error('请输入需要解析的文本');
     if (!s.llmKey) throw new Error('尚未配置 AI 服务密钥，请先在「系统设置 → AI 服务」中填写');

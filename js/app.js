@@ -17,6 +17,8 @@ const App = {
      ============================================================ */
   async boot() {
     await ProjectStore.init();
+    // 预解密 AI 密钥到内存（本地加密存储，明文不落盘）
+    LlmExtract._loadKey().catch(() => {});
     const settings = ProjectStore.loadSettings();
     this.currentTheme = settings.theme || 'light';
     // 界面语言（中/英）：设置后替换全部静态文案，动态文案经 I18n.tr 实时翻译
@@ -1513,9 +1515,13 @@ const App = {
             <input type="text" id="llmBase" value="${Utils.escapeHtml(cfg.llmBase || '')}" placeholder="https://api.deepseek.com/v1"></div>
           <div class="form-item"><label>模型名</label>
             <input type="text" id="llmModel" value="${Utils.escapeHtml(cfg.llmModel || '')}" placeholder="deepseek-chat"></div>
-          <div class="form-item"><label>API 密钥（仅保存在本机浏览器）</label>
-            <input type="password" id="llmKey" value="${Utils.escapeHtml(cfg.llmKey || '')}" placeholder="sk-…"></div>
-          <button class="btn primary" id="llmSaveCfg">保存配置</button>
+          <div class="form-item"><label>API 密钥（本地加密存储，明文不落盘）</label>
+            <input type="password" id="llmKey" value="" placeholder="${cfg.llmKey ? '已加密保存密钥，留空则不修改…' : 'sk-…'}"></div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="btn primary" id="llmSaveCfg">保存配置</button>
+            <button class="btn" id="llmClearKey" style="${cfg.llmKey ? '' : 'display:none'}">清除已存密钥</button>
+            <span class="dim" style="color:var(--muted)">AES-GCM 加密</span>
+          </div>
         </div>
         <div class="form-item"><label>粘贴任意小说 / 剧本文本（约 1.5 万字内）</label>
           <textarea id="llmText" rows="10" placeholder="粘贴正文，AI 将自动抽取人物、关系与事件…" style="width:100%;resize:vertical"></textarea>
@@ -1561,14 +1567,26 @@ const App = {
         this.toast('读取文件失败：' + (e.message || '未知错误'), 'error');
       }
     };
-    m.body.querySelector('#llmSaveCfg').onclick = () => {      const base = m.body.querySelector('#llmBase').value.trim().replace(/\/+$/, '');
+    m.body.querySelector('#llmSaveCfg').onclick = async () => {
+      const base = m.body.querySelector('#llmBase').value.trim().replace(/\/+$/, '');
       const model = m.body.querySelector('#llmModel').value.trim();
       const key = m.body.querySelector('#llmKey').value.trim();
-      if (!base || !model || !key) { this.toast('请填写完整的服务地址 / 模型名 / 密钥', 'warn'); return; }
-      ProjectStore.saveSettings({ llmBase: base, llmModel: model, llmKey: key });
+      if (!base || !model) { this.toast('请填写服务地址与模型名', 'warn'); return; }
+      const patch = { llmBase: base, llmModel: model };
+      // 密钥留空 = 沿用已加密保存的密钥；输入新值才会加密替换
+      if (key) patch.llmKey = key;
+      await LlmExtract.saveSettings(patch);
+      m.body.querySelector('#llmKey').value = '';
+      if (key) m.body.querySelector('#llmClearKey').style.display = '';
       cfgPanel.classList.add('hidden');
       toggleCfg.textContent = `⚙ 配置 AI 服务（当前：${model}）`;
-      this.toast('AI 服务配置已保存', 'success');
+      this.toast(key ? 'AI 服务配置已保存（API 密钥已加密存储）' : 'AI 服务配置已保存（密钥沿用已存值）', 'success');
+    };
+    m.body.querySelector('#llmClearKey').onclick = async () => {
+      await LlmExtract.saveSettings({ llmKey: '' });
+      m.body.querySelector('#llmClearKey').style.display = 'none';
+      m.body.querySelector('#llmKey').value = '';
+      this.toast('已清除本机保存的 API 密钥', 'success');
     };
     m.body.parentElement.querySelector('[data-act=run]').onclick = async () => {
       const text = m.body.querySelector('#llmText').value;

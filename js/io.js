@@ -901,6 +901,10 @@ const DataIO = {
           }
         } else {
           subsection = h.replace(/^[一二三四五六七八九十\d]+(?:\.\d+)?[、.．]\s*/, '').trim();
+          // 三级标题若为家族/阵营子节，优先作为人物分组（时间线/大事记/待考等小节不参与）
+          if (subsection && !/时间线|年代线|大事记|因果序|待考|备注|奖励章节/.test(subsection) && !/详细剧情|剧情章节/.test(sectionRaw)) {
+            group = subsection;
+          }
           chapterPending = null;
           // 详细剧情章节 → 事件
           if (/详细剧情|剧情章节/.test(sectionRaw) && subsection) {

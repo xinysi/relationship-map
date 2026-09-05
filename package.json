@@ -1,6 +1,6 @@
 {
   "name": "rwgxw",
-  "version": "1.6.1",
+  "version": "1.6.2",
   "description": "人物关系网可视化工具：多格式导入、6 种自动布局、时间轴与加密工程管理的本地关系图谱工作台",
   "private": true,
   "scripts": {

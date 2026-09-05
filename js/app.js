@@ -1518,7 +1518,11 @@ const App = {
           <button class="btn primary" id="llmSaveCfg">保存配置</button>
         </div>
         <div class="form-item"><label>粘贴任意小说 / 剧本文本（约 1.5 万字内）</label>
-          <textarea id="llmText" rows="10" placeholder="粘贴正文，AI 将自动抽取人物、关系与事件…" style="width:100%;resize:vertical"></textarea></div>
+          <textarea id="llmText" rows="10" placeholder="粘贴正文，AI 将自动抽取人物、关系与事件…" style="width:100%;resize:vertical"></textarea>
+          <div style="margin-top:6px;display:flex;align-items:center;gap:10px">
+            <label class="btn" style="cursor:pointer">📄 上传 md/txt 文件<input type="file" id="llmFile" accept=".md,.markdown,.txt,text/plain,text/markdown" hidden></label>
+            <span class="dim" id="llmFileName" style="color:var(--muted)"></span>
+          </div></div>
         <div class="form-hint" style="margin-bottom:10px">⚠ 隐私提示：文本将发送至你配置的第三方 AI 服务（当前：${Utils.escapeHtml(cfg.llmModel || '未设置')}）用于提取，发送前请确认内容可接受。</div>
         <div id="llmProgress" class="hidden">
           <div class="progress-wrap"><div class="progress-bar"><div class="progress-inner"></div></div><div class="progress-text">准备中…</div></div>
@@ -1541,8 +1545,22 @@ const App = {
         m.body.querySelector('#llmModel').value = p.model;
       }
     };
-    m.body.querySelector('#llmSaveCfg').onclick = () => {
-      const base = m.body.querySelector('#llmBase').value.trim().replace(/\/+$/, '');
+    // 上传 md/txt 文件：读入文本填入提取框
+    m.body.querySelector('#llmFile').onchange = async (ev) => {
+      const f = (ev.target && ev.target.files && ev.target.files[0]) || null;
+      const fileTag = m.body.querySelector('#llmFileName');
+      if (!f) return;
+      try {
+        const txt = await f.text();
+        m.body.querySelector('#llmText').value = txt;
+        fileTag.textContent = f.name + '（' + txt.length + ' 字）';
+        this.toast('已读取文件文本，点击「开始提取」即可', 'success');
+      } catch (e) {
+        fileTag.textContent = '';
+        this.toast('读取文件失败：' + (e.message || '未知错误'), 'error');
+      }
+    };
+    m.body.querySelector('#llmSaveCfg').onclick = () => {      const base = m.body.querySelector('#llmBase').value.trim().replace(/\/+$/, '');
       const model = m.body.querySelector('#llmModel').value.trim();
       const key = m.body.querySelector('#llmKey').value.trim();
       if (!base || !model || !key) { this.toast('请填写完整的服务地址 / 模型名 / 密钥', 'warn'); return; }

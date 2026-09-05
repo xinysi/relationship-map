@@ -1522,7 +1522,8 @@ const App = {
           <div style="margin-top:6px;display:flex;align-items:center;gap:10px">
             <label class="btn" style="cursor:pointer">📄 上传 md/txt 文件<input type="file" id="llmFile" accept=".md,.markdown,.txt,text/plain,text/markdown" hidden></label>
             <span class="dim" id="llmFileName" style="color:var(--muted)"></span>
-          </div></div>
+          </div>
+          <div class="form-hint" style="margin-top:4px">提示：单文件建议 ≤ 8,000 字，超长会在输入上限附近被截断，请按卷/篇分次提取。</div></div>
         <div class="form-hint" style="margin-bottom:10px">⚠ 隐私提示：文本将发送至你配置的第三方 AI 服务（当前：${Utils.escapeHtml(cfg.llmModel || '未设置')}）用于提取，发送前请确认内容可接受。</div>
         <div id="llmProgress" class="hidden">
           <div class="progress-wrap"><div class="progress-bar"><div class="progress-inner"></div></div><div class="progress-text">准备中…</div></div>
@@ -1553,7 +1554,7 @@ const App = {
       try {
         const txt = await f.text();
         m.body.querySelector('#llmText').value = txt;
-        fileTag.textContent = f.name + '（' + txt.length + ' 字）';
+        fileTag.textContent = f.name + '（' + txt.length + ' 字' + (txt.length > 8000 ? '，⚠ 已超 8,000 字，建议分卷提取' : '') + '）';
         this.toast('已读取文件文本，点击「开始提取」即可', 'success');
       } catch (e) {
         fileTag.textContent = '';

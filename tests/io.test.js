@@ -191,10 +191,14 @@ test('SVG 矢量文档：默认无标签墙 + 选项生效 + XSS 转义', () => 
   assert.equal((doc.svg.match(/<circle/g) || []).length, GraphStore.persons.length, '每节点一个 circle');
   assert.ok(doc.svg.includes('<path'), '关系边为 path');
   assert.ok((doc.svg.match(/<text/g) || []).length >= GraphStore.persons.length * 2, '每个节点有首字 + 名称');
-  // 默认不导出边标签（避免标签墙拥挤），勾选后包含
+  // 默认不导出边标签（避免标签墙拥挤），勾选后包含；导出上限 400 条边（防止标签墙）
   assert.equal((doc.svg.match(/rx="4"/g) || []).length, 0, '默认无边标签');
   const docL = DataIO._svgDocument({ labels: true });
-  assert.ok((docL.svg.match(/rx="4"/g) || []).length > 0, '勾选后包含边标签');
+  if (GraphStore.relations.length <= 400) {
+    assert.ok((docL.svg.match(/rx="4"/g) || []).length > 0, '勾选后包含边标签');
+  } else {
+    assert.equal((docL.svg.match(/rx="4"/g) || []).length, 0, '关系数超出 400 上限时不输出边标签（防标签墙）；示例数据 417 条即此情形');
+  }
   // XSS 防护：特殊字符转义
   GraphStore.persons[0].name = '甲<&>乙';
   const doc2 = DataIO._svgDocument();
